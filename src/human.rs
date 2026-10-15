@@ -1,17 +1,27 @@
-use std::path::PathBuf;
-
 use bevy::{
-    asset::RenderAssetUsages,
-    image::{CompressedImageFormats, ImageSampler, ImageType},
+    gltf::{GltfAssetLabel, GltfExtras, GltfMaterialName},
+    math::Affine2,
+    platform::collections::HashMap,
     prelude::*,
-    render::render_resource::PrimitiveTopology,
+    world_serialization::WorldInstanceReady,
 };
 
-use crate::models::{BONES, Cmc, Cmo, Corner, HEAD_BONE, apply_colours, bone_places};
-
-const DEFAULT_GAME_DIR: &str = "S:/SteamLibrary/steamapps/common/Sub Rosa";
+/// The human skeleton's bones as the models' joints are named, each one's parent, and how far down from the root the
+/// pelvis hangs.
+pub const BONES: usize = 16;
+const BONE_NAMES: [&str; BONES] = [
+    "Pelvis", "Stomach", "Torso", "Head", "ShoulderL", "ForearmL", "HandL", "ShoulderR", "ForearmR", "HandR", "ThighL", "ShinL", "FootL", "ThighR",
+    "ShinR", "FootR",
+];
+const PARENTS: [usize; BONES] = [0, 0, 1, 2, 2, 4, 5, 2, 7, 8, 0, 10, 11, 0, 13, 14];
+const PELVIS_DROP: Vec3 = Vec3::new(0.0, -0.125, 0.0);
+/// Where a body's head and hair go.
+const HEAD_MOUNT: &str = "HeadMount";
+/// How many head and hair styles each gender has (fhead1..5, fhair1..9 and the same for men).
 pub const HEADS: usize = 5;
 pub const HAIRS: usize = 9;
+/// The skinned model slots and the models init_game_resources loads into them: women's bodies from 0, men's from 8,
+/// ties from 0x10 and necklaces from 0x14, two per gender.
 const MODEL_SLOTS: usize = 0x18;
 const MODEL_FILES: [(usize, &str); 12] = [
     (0, "fcasual1"),
@@ -27,11 +37,12 @@ const MODEL_FILES: [(usize, &str); 12] = [
     (0x16, "mnecklace1"),
     (0x17, "mnecklace4"),
 ];
+/// The palette has sixteen colour columns.
+const COLUMNS: f32 = 16.0;
 
-pub fn model_dir() -> PathBuf {
-    PathBuf::from(std::env::var("SUBROSA_DIR").unwrap_or_else(|_| DEFAULT_GAME_DIR.to_string())).join("data").join("model")
-}
-
+/// How a human looks, as the server describes it: gender (0 a woman, 1 a man), head and hair styles, the palette
+/// columns of its skin, hair and eyes, its clothes (model 0 casual, 1 and 2 a suit) and their colour, its tie's
+/// colour plus one (0 for none) and its necklace (0 for none).
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[require(Transform, Visibility)]
 pub struct HumanLook {
@@ -47,6 +58,26 @@ pub struct HumanLook {
     pub necklace: u32,
 }
 
+impl HumanLook {
+    /// What the look's models are, apart from their colours.
+    fn shape(&self) -> (u32, u32, bool, u32, u32, u32) {
+        (self.gender, self.model, self.tie_colour > 0, self.necklace, self.head, self.hair)
+    }
+
+    /// The palette column of a colour slot: skin, suit, tie, hair or eyes.
+    fn column(&self, slot: &str) -> Option<u32> {
+        Some(match slot {
+            "skin" => self.skin_colour,
+            "suit" => self.suit_colour,
+            "tie" => self.tie_colour.saturating_sub(1),
+            "hair" => self.hair_colour,
+            "eyes" => self.eye_colour,
+            _ => return None,
+        })
+    }
+}
+
+/// How a human's bones are turned, each by its own turn (not its parent's); all upright by default.
 #[derive(Component, Clone, Copy, Debug, PartialEq)]
 pub struct HumanPose(pub [Quat; BONES]);
 
@@ -56,125 +87,205 @@ impl Default for HumanPose {
     }
 }
 
+/// How low a human reaches below its root standing upright (from its body model), to stand it on something.
 #[derive(Component, Clone, Copy, Debug, Default)]
 pub struct HumanExtent {
     pub lowest: f32,
 }
 
-#[derive(Component)]
-struct HumanPart;
-
-#[derive(Resource)]
-pub struct HumanModels {
-    skinned: Vec<Option<Cmc>>,
-    heads: [Vec<Option<Cmo>>; 2],
-    hairs: [Vec<Option<Cmo>>; 2],
-    body_material: Handle<StandardMaterial>,
-    head_material: Handle<StandardMaterial>,
+/// A model a human is made of: its body (which carries the head and hair once it has spawned), a tie or necklace,
+/// or the head and hair themselves.
+#[derive(Component, Clone, Debug)]
+enum HumanPart {
+    Body { head: Option<String>, hair: Option<String> },
+    Extra,
+    Head,
 }
 
+/// The models a human was built from, so a change of colour alone doesn't rebuild it.
+#[derive(Component, PartialEq)]
+struct BuiltShape((u32, u32, bool, u32, u32, u32));
+
+/// A part's joints, by bone, once its model has spawned.
+#[derive(Component)]
+struct Joints([Entity; BONES]);
+
+/// A mesh in one of the palette's colour slots, and the model's own material for it.
+#[derive(Component)]
+struct SlotMaterial {
+    slot: String,
+    base: Handle<StandardMaterial>,
+}
+
+/// The slot materials made for each colour, shared by every human wearing it.
+#[derive(Resource, Default)]
+struct ColouredMaterials(HashMap<(AssetId<StandardMaterial>, u32), Handle<StandardMaterial>>);
+
+/// Humans: any entity with a [`HumanLook`] gets its body, tie, necklace, head and hair (assets/models/*.glb) under
+/// it, coloured from its look and posed by its [`HumanPose`] (upright if it has none), the skeleton's root at the
+/// entity.
 pub struct HumanPlugin;
 
 impl Plugin for HumanPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PreStartup, load).add_systems(PostUpdate, build_humans.before(TransformSystems::Propagate));
+        app.init_resource::<ColouredMaterials>()
+            .add_systems(Update, (build_humans, colour_humans).chain())
+            .add_systems(PostUpdate, pose_humans.before(TransformSystems::Propagate));
     }
 }
 
-fn load(mut commands: Commands, mut materials: ResMut<Assets<StandardMaterial>>, mut images: ResMut<Assets<Image>>) {
-    let dir = model_dir();
-    let read = |name: String| std::fs::read(dir.join(&name)).ok();
-    let mut skinned: Vec<Option<Cmc>> = (0..MODEL_SLOTS).map(|_| None).collect();
-
-    for (slot, name) in MODEL_FILES {
-        skinned[slot] = read(format!("{name}.cmc")).and_then(|b| Cmc::parse(&b));
-    }
-
-    let styles = |g: &str, kind: &str, count: usize| -> Vec<Option<Cmo>> { (1..=count).map(|k| read(format!("{g}{kind}{k}.cmo")).and_then(|b| Cmo::parse(&b))).collect() };
-    let palette = |sampler: ImageSampler| {
-        std::fs::read(dir.join("tex_1.png"))
-            .ok()
-            .and_then(|bytes| Image::from_buffer(&bytes, ImageType::Extension("png"), CompressedImageFormats::NONE, true, sampler, RenderAssetUsages::default()).ok())
-            .unwrap_or_default()
-    };
-
-    let mut material = |image: Image| materials.add(StandardMaterial { base_color_texture: Some(images.add(image)), perceptual_roughness: 0.5, metallic: 0.0, ..default() });
-    let body_material = material(palette(ImageSampler::linear()));
-    let head_material = material(palette(ImageSampler::nearest()));
-
-    commands.insert_resource(HumanModels {
-        skinned,
-        heads: [styles("f", "head", HEADS), styles("m", "head", HEADS)],
-        hairs: [styles("f", "hair", HAIRS), styles("m", "hair", HAIRS)],
-        body_material,
-        head_material,
-    });
+fn model(assets: &AssetServer, name: &str) -> WorldAssetRoot {
+    WorldAssetRoot(assets.load(GltfAssetLabel::Scene(0).from_asset(format!("models/{name}.glb"))))
 }
 
-fn body_slots(look: &HumanLook) -> [Option<usize>; 3] {
+/// body_models: the models of a human's body (its clothes for its gender), its tie if it wears one and its necklace
+/// if it wears one.
+fn body_models(look: &HumanLook) -> [Option<&'static str>; 3] {
     let kind = if look.model == 2 || look.model == 3 { look.model as usize } else { (look.model == 1) as usize };
     let body = kind + if look.gender == 1 { 8 } else { 0 };
     let tie = (look.tie_colour > 0).then_some(0x10 + look.gender as usize * 2);
     let necklace = (look.necklace > 0).then_some(look.necklace as usize + look.gender as usize * 2 + 0x13);
-
-    [Some(body), tie, necklace].map(|s| s.filter(|&s| s < MODEL_SLOTS))
+    [Some(body), tie, necklace].map(|s| s.filter(|&s| s < MODEL_SLOTS).and_then(|s| MODEL_FILES.iter().find(|f| f.0 == s).map(|f| f.1)))
 }
 
-fn mesh(corners: &[Corner]) -> Mesh {
-    let tris: Vec<Corner> = corners.as_chunks::<3>().0.iter().flat_map(|t| [t[0], t[2], t[1]]).collect();
-
-    Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
-        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, tris.iter().map(|c| c.pos.to_array()).collect::<Vec<_>>())
-        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, tris.iter().map(|c| c.normal.to_array()).collect::<Vec<_>>())
-        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, tris.iter().map(|c| [c.uv.x, 1.0 - c.uv.y]).collect::<Vec<_>>())
-}
-
-fn style(list: &[Option<Cmo>], k: u32) -> Option<&Cmo> {
-    list.get(k as usize).and_then(Option::as_ref)
-}
-
+/// A human whose models changed has its parts replaced: the body (which brings the head and hair when it is ready),
+/// then its tie and necklace.
 fn build_humans(
     mut commands: Commands,
-    models: Option<Res<HumanModels>>,
-    humans: Query<(Entity, &HumanLook, Option<&HumanPose>, Option<&Children>), Or<(Changed<HumanLook>, Changed<HumanPose>)>>,
+    assets: Res<AssetServer>,
+    humans: Query<(Entity, &HumanLook, Option<&BuiltShape>, Option<&Children>), Changed<HumanLook>>,
     parts: Query<(), With<HumanPart>>,
-    mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    let Some(models) = models else { return };
-    for (human, look, pose, children) in &humans {
+    for (human, look, built, children) in &humans {
+        let shape = BuiltShape(look.shape());
+        if built == Some(&shape) {
+            continue;
+        }
         for &child in children.into_iter().flatten() {
             if parts.contains(child) {
                 commands.entity(child).despawn();
             }
         }
-
-        let rot = pose.copied().unwrap_or_default().0;
-        let pos = bone_places(Vec3::ZERO, &rot);
-        let tie = if look.tie_colour > 0 { look.tie_colour - 1 } else { 0 };
-        let mut lowest = f32::MAX;
-
-        for model in body_slots(look).into_iter().flatten().filter_map(|s| models.skinned[s].as_ref()) {
-            let mut corners = model.posed_corners(&model.rest_pose(), &rot, &pos);
-
-            apply_colours(&mut corners, [look.skin_colour, look.suit_colour, tie, 0]);
-
-            lowest = corners.iter().fold(lowest, |m, c| m.min(c.pos.y));
-
-            commands.spawn((Mesh3d(meshes.add(mesh(&corners))), MeshMaterial3d(models.body_material.clone()), Transform::default(), HumanPart, ChildOf(human)));
+        commands.entity(human).insert(shape);
+        let g = if look.gender == 1 { "m" } else { "f" };
+        let head = (look.head < HEADS as u32).then(|| format!("{g}head{}", look.head + 1));
+        let hair = (look.hair < HAIRS as u32).then(|| format!("{g}hair{}", look.hair + 1));
+        for (k, name) in body_models(look).into_iter().enumerate() {
+            let Some(name) = name else { continue };
+            let part = if k == 0 { HumanPart::Body { head: head.clone(), hair: hair.clone() } } else { HumanPart::Extra };
+            commands.spawn((model(&assets, name), part, ChildOf(human))).observe(part_ready);
         }
+    }
+}
 
-        let g = (look.gender == 1) as usize;
-        let head_at = Transform::from_translation(pos[HEAD_BONE] + rot[HEAD_BONE] * Vec3::Y * 0.125).with_rotation(rot[HEAD_BONE]);
-        let colours = [look.skin_colour, look.hair_colour, look.eye_colour, 0];
-
-        for model in [style(&models.heads[g], look.head), style(&models.hairs[g], look.hair)].into_iter().flatten() {
-            let mut corners = model.head_corners(g == 0);
-
-            apply_colours(&mut corners, colours);
-
-            commands.spawn((Mesh3d(meshes.add(mesh(&corners))), MeshMaterial3d(models.head_material.clone()), head_at, HumanPart, ChildOf(human)));
+/// A part's model has spawned: its joints are found for posing, its colour-slot meshes noted, a body's standing
+/// height given to its human, and a body's head and hair put on its head mount.
+fn part_ready(
+    ready: On<WorldInstanceReady>,
+    mut commands: Commands,
+    assets: Res<AssetServer>,
+    parts: Query<(&HumanPart, &ChildOf)>,
+    children: Query<&Children>,
+    names: Query<&Name>,
+    extras: Query<&GltfExtras>,
+    slots: Query<(&GltfMaterialName, &MeshMaterial3d<StandardMaterial>)>,
+) {
+    let part = ready.entity;
+    let Ok((kind, &ChildOf(owner))) = parts.get(part) else { return };
+    let mut joints: [Option<Entity>; BONES] = [None; BONES];
+    let mut mount = None;
+    for e in children.iter_descendants(part) {
+        if let Ok(name) = names.get(e) {
+            if let Some(k) = BONE_NAMES.iter().position(|b| *b == name.as_str()) {
+                joints[k] = Some(e);
+            } else if name.as_str() == HEAD_MOUNT {
+                mount = Some(e);
+            }
         }
+        if let Ok((slot, material)) = slots.get(e)
+            && matches!(slot.0.as_str(), "skin" | "suit" | "tie" | "hair" | "eyes")
+        {
+            commands.entity(e).insert(SlotMaterial { slot: slot.0.clone(), base: material.0.clone() });
+        }
+        if let HumanPart::Body { .. } = kind
+            && let Some(lowest) = extras.get(e).ok().and_then(|x| lowest(&x.value))
+        {
+            commands.entity(owner).insert(HumanExtent { lowest });
+        }
+    }
+    if joints.iter().all(Option::is_some) {
+        commands.entity(part).insert(Joints(joints.map(Option::unwrap)));
+    }
+    if let (HumanPart::Body { head, hair }, Some(mount)) = (kind, mount) {
+        for name in [head, hair].into_iter().flatten() {
+            commands.spawn((model(&assets, name), HumanPart::Head, ChildOf(mount))).observe(part_ready);
+        }
+    }
+}
 
-        commands.entity(human).insert(HumanExtent { lowest: if lowest == f32::MAX { 0.0 } else { lowest } });
+/// The `"lowest"` number in a node's extras.
+fn lowest(extras: &str) -> Option<f32> {
+    let rest = &extras[extras.find("\"lowest\"")? + "\"lowest\"".len()..];
+    let rest = rest.trim_start().strip_prefix(':')?.trim_start();
+    let end = rest.find(|c: char| !(c.is_ascii_digit() || matches!(c, '-' | '+' | '.' | 'e' | 'E'))).unwrap_or(rest.len());
+    rest[..end].parse().ok()
+}
+
+/// The world shader's colour slots: each slot mesh of a human gets its model's material moved along the palette to
+/// the human's colour for that slot, when it appears or the human's colours change.
+fn colour_humans(
+    humans: Query<(Entity, &HumanLook)>,
+    changed: Query<(), Changed<HumanLook>>,
+    mut meshes: Query<(Entity, &SlotMaterial, &mut MeshMaterial3d<StandardMaterial>)>,
+    added: Query<(), Added<SlotMaterial>>,
+    parents: Query<&ChildOf>,
+    mut coloured: ResMut<ColouredMaterials>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    for (e, slot, mut material) in &mut meshes {
+        let Some((human, look)) = parents.iter_ancestors(e).find_map(|a| humans.get(a).ok()) else { continue };
+        if !added.contains(e) && !changed.contains(human) {
+            continue;
+        }
+        let Some(column) = look.column(&slot.slot) else { continue };
+        let key = (slot.base.id(), column);
+        let handle = match coloured.0.get(&key) {
+            Some(h) => h.clone(),
+            None => {
+                let Some(mut m) = materials.get(&slot.base).cloned() else { continue };
+                m.uv_transform = Affine2::from_translation(Vec2::new(column as f32 / COLUMNS, 0.0));
+                let h = materials.add(m);
+                coloured.0.insert(key, h.clone());
+                h
+            }
+        };
+        if material.0 != handle {
+            material.0 = handle;
+        }
+    }
+}
+
+/// bone_uniforms through the models' joints: each joint turned by its bone's turn less its parent's (the pose gives
+/// each bone's own), and the pelvis hung from the root turned by its own.
+fn pose_humans(
+    humans: Query<Ref<HumanPose>>,
+    parts: Query<(&ChildOf, Ref<Joints>)>,
+    mut transforms: Query<&mut Transform>,
+) {
+    for (&ChildOf(human), joints) in &parts {
+        let Ok(pose) = humans.get(human) else { continue };
+        if !pose.is_changed() && !joints.is_added() {
+            continue;
+        }
+        let rot = pose.0;
+        for (i, &joint) in joints.0.iter().enumerate() {
+            let Ok(mut t) = transforms.get_mut(joint) else { continue };
+            if i == 0 {
+                t.rotation = rot[0];
+                t.translation = rot[0] * PELVIS_DROP;
+            } else {
+                t.rotation = rot[PARENTS[i]].inverse() * rot[i];
+            }
+        }
     }
 }

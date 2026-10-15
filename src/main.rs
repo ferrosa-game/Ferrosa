@@ -2,7 +2,6 @@ mod config;
 mod human;
 mod masterserver;
 mod menu;
-mod models;
 mod net;
 mod steam;
 mod ui;
