@@ -2788,7 +2788,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-map"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "binrw",
  "glam",
@@ -2800,7 +2800,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-physics"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "glam",
  "rayon",
@@ -2808,7 +2808,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-protocol"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "bitflags 2.13.2",
  "glam",
@@ -2818,7 +2818,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-world"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "ferrosa-map",
  "ferrosa-physics",
@@ -3316,6 +3316,12 @@ dependencies = [
  "glam",
  "tinyvec",
 ]
+
+[[package]]
+name = "hound"
+version = "3.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62adaabb884c94955b19907d60019f4e145d091c75345379e70d1ee696f7854f"
 
 [[package]]
 name = "http"
@@ -5270,6 +5276,7 @@ checksum = "d0a536bb79db59098ef71a4dd4246c02eb87b316deceb1b68e0cde7167ec01eb"
 dependencies = [
  "cpal",
  "dasp_sample",
+ "hound",
  "lewton",
  "num-rational",
  "thiserror 2.0.21",

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy = "0.20"
+bevy = { version = "0.20", features = ["wav"] }
 bevy_enhanced_input = "0.27"
 steamworks = { version = "0.13.1", features = ["raw-bindings"] }
 rand = "0.10"

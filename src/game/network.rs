@@ -1,6 +1,10 @@
 use bevy::prelude::*;
 
-use super::{Level, camera::GameCamera, netgame::NetGame};
+use super::{
+    Level,
+    camera::GameCamera,
+    netgame::{NetEvent, NetGame},
+};
 use crate::{menu::Screen, net::ClientSocket};
 
 pub const TICK_SECONDS: f64 = 0.016;
@@ -18,7 +22,8 @@ pub struct NetworkPlugin;
 
 impl Plugin for NetworkPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(Time::<Fixed>::from_seconds(TICK_SECONDS))
+        app.add_message::<NetEvent>()
+            .insert_resource(Time::<Fixed>::from_seconds(TICK_SECONDS))
             .configure_sets(
                 FixedUpdate,
                 (NetTick::Input, NetTick::Send, NetTick::Receive, NetTick::Events, NetTick::Follow).chain().run_if(resource_exists::<NetGame>),
@@ -44,8 +49,9 @@ fn receive_packets(mut commands: Commands, mut net: ResMut<NetGame>, mut socket:
     }
 }
 
-fn play_events(mut net: ResMut<NetGame>) {
+fn play_events(mut net: ResMut<NetGame>, mut happenings: MessageWriter<NetEvent>) {
     net.process_events();
+    happenings.write_batch(net.happenings.drain(..));
 }
 
 fn start_new_round(mut commands: Commands, mut net: ResMut<NetGame>, level: Option<Res<Level>>, mut next: ResMut<NextState<Screen>>) {

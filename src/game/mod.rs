@@ -17,6 +17,7 @@ mod player_menu;
 mod roster;
 mod sky;
 mod smoothing;
+mod sounds;
 mod terrain;
 mod textures;
 mod vehicles;
@@ -53,7 +54,7 @@ impl Plugin for GamePlugin {
             vehicles::VehiclesPlugin,
             items::ItemsPlugin,
             smoothing::SmoothingPlugin,
-            (hud::HudPlugin, inventory::InventoryPlugin, paper_doll::PaperDollPlugin, doors::DoorsPlugin),
+            (hud::HudPlugin, inventory::InventoryPlugin, paper_doll::PaperDollPlugin, doors::DoorsPlugin, sounds::SoundsPlugin),
         ))
         .add_systems(Update, scale_ui.run_if(in_state(Screen::InGame)))
         .add_systems(OnExit(Screen::InGame), |mut scale: ResMut<UiScale>| scale.0 = 1.0);

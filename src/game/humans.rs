@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use ferrosa_protocol::CharacterCustomization;
+use ferrosa_world::skeleton::BONES as TEMPLATES;
 
 use super::{
     netgame::NetGame,
@@ -34,6 +35,17 @@ fn look(c: &CharacterCustomization) -> HumanLook {
         tie_colour: c.tie_color as u32,
         necklace: c.necklace as u32,
     }
+}
+
+pub fn bone_at(pos: Vec3, pose: &HumanPose, bone: usize) -> (Vec3, Quat) {
+    if bone == 0 {
+        return (pos, pose.0[0]);
+    }
+
+    let (parent, template) = (PARENTS[bone], &TEMPLATES[bone]);
+    let (at, _) = bone_at(pos, pose, parent);
+
+    (at + pose.0[parent] * template.joint + pose.0[bone] * (template.offset - template.joint), pose.0[bone])
 }
 
 pub fn pose(root: Quat, bones: &[Quat; BONES - 1]) -> HumanPose {

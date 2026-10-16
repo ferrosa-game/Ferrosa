@@ -23,6 +23,7 @@ use crate::menu::Screen;
 
 const WINDOW: &str = "window.";
 const GLASS: Color = Color::srgba(0.08, 0.1, 0.12, 0.55);
+const CLEAR_GLASS: Color = Color::srgba(1.0, 1.0, 1.0, 0.04);
 const COLUMNS: u32 = 16;
 const BURNT: u32 = 6;
 const ROTOR_HEIGHT: f32 = 1.5;
@@ -94,20 +95,20 @@ struct PaintSlot(Handle<StandardMaterial>);
 struct CarWindow(usize);
 
 #[derive(Resource)]
-struct Glass(Handle<StandardMaterial>);
+struct Glass {
+    tinted: Handle<StandardMaterial>,
+    clear: Handle<StandardMaterial>,
+}
+
+#[derive(Component)]
+struct Pane;
 
 impl FromWorld for Glass {
     fn from_world(world: &mut World) -> Self {
-        let glass = StandardMaterial {
-            base_color: GLASS,
-            alpha_mode: AlphaMode::Blend,
-            perceptual_roughness: 0.05,
-            reflectance: 0.5,
-            cull_mode: None,
-            ..default()
-        };
+        let glass = |base_color| StandardMaterial { base_color, alpha_mode: AlphaMode::Blend, perceptual_roughness: 0.05, reflectance: 0.5, cull_mode: None, ..default() };
+        let mut materials = world.resource_mut::<Assets<StandardMaterial>>();
 
-        Self(world.resource_mut::<Assets<StandardMaterial>>().add(glass))
+        Self { tinted: materials.add(glass(GLASS)), clear: materials.add(glass(CLEAR_GLASS)) }
     }
 }
 
@@ -124,6 +125,7 @@ impl Plugin for VehiclesPlugin {
             .add_systems(Update, glide::<WheelPose>.in_set(Smoothing::Glide))
             .add_systems(Update, turn_wheels.after(Smoothing::Glide).run_if(in_state(Screen::InGame)).run_if(resource_exists::<NetGame>))
             .add_systems(Update, (hide_physics, glaze, mark_paint, paint).chain().after(Smoothing::Glide).run_if(in_state(Screen::InGame)))
+            .add_systems(Update, clear_own_glass.after(glaze).run_if(in_state(Screen::InGame)).run_if(resource_exists::<NetGame>))
             .add_systems(Update, break_windows.after(hide_physics).run_if(in_state(Screen::InGame)).run_if(resource_exists::<NetGame>));
     }
 }
@@ -325,6 +327,7 @@ fn hide_physics(mut commands: Commands, named: Query<(Entity, &Name), Added<Name
 }
 
 fn glaze(
+    mut commands: Commands,
     glass: Res<Glass>,
     mut panes: Query<(Entity, &mut MeshMaterial3d<StandardMaterial>), Added<MeshMaterial3d<StandardMaterial>>>,
     names: Query<&Name>,
@@ -334,7 +337,27 @@ fn glaze(
         let in_window = std::iter::once(e).chain(parents.iter_ancestors(e)).any(|a| names.get(a).is_ok_and(|n| window_of(n.as_str()).is_some()));
 
         if in_window {
-            material.0 = glass.0.clone();
+            material.0 = glass.tinted.clone();
+            commands.entity(e).insert(Pane);
+        }
+    }
+}
+
+fn clear_own_glass(
+    net: Res<NetGame>,
+    glass: Res<Glass>,
+    mut panes: Query<(Entity, &mut MeshMaterial3d<StandardMaterial>), With<Pane>>,
+    vehicles: Query<&NetVehicle>,
+    parents: Query<&ChildOf>,
+) {
+    let own = net.me().and_then(|p| usize::try_from(p.human).ok()).and_then(|h| net.humans.get(h)).and_then(|h| usize::try_from(h.vehicle).ok());
+
+    for (e, mut material) in &mut panes {
+        let vehicle = parents.iter_ancestors(e).find_map(|a| vehicles.get(a).ok()).map(|nv| nv.index);
+        let wanted = if vehicle.is_some() && vehicle == own { &glass.clear } else { &glass.tinted };
+
+        if material.0 != *wanted {
+            material.0 = wanted.clone();
         }
     }
 }

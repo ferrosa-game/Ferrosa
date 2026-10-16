@@ -7,7 +7,7 @@ use ferrosa_protocol::{
         game::{
             GameState, ItemKind, MenuType, ItemTail, VehicleKind, MenuButton, OwnHumanData, ServerGamePacket,
             decode::{ObjectDecoder, SlotChange},
-            events::{Event, ServerEvent, chat::ChatType},
+            events::{Event, ServerEvent, chat::ChatType, sound::Sound},
         },
         initial_sync::InitialSync,
     },
@@ -292,6 +292,18 @@ pub struct ChatLine {
     pub text: String,
 }
 
+#[derive(Message, Clone, Debug)]
+pub enum NetEvent {
+    Gunshot { kind: Option<ItemKind>, pos: Vec3, vel: Vec3 },
+    BulletHit { hit: i32, pos: Vec3, normal: Vec3 },
+    BulletHole { pos: Vec3, glass: bool },
+    Explosion { pos: Vec3 },
+    WindowBroke { pos: Vec3 },
+    Sound { sound: Sound, pos: Vec3, volume: f32, pitch: f32 },
+}
+
+const FRESH: u32 = 0x63;
+
 #[derive(Resource)]
 pub struct NetGame {
     pub server: SocketAddrV4,
@@ -317,6 +329,7 @@ pub struct NetGame {
     pub traffic_count: u32,
     pub signals: Vec<[i32; 4]>,
     pub team_doors: Vec<bool>,
+    pub happenings: Vec<NetEvent>,
     pub chat: Vec<ChatLine>,
     pub decoder: ObjectDecoder,
     events: Vec<Option<Event>>,
@@ -362,6 +375,7 @@ impl NetGame {
             traffic_count: 0,
             signals: vec![[0; 4]; 0x400],
             team_doors: Vec::new(),
+            happenings: Vec::new(),
             chat: Vec::new(),
             decoder: ObjectDecoder::default(),
             events: vec![None; EVENTS],
@@ -723,11 +737,31 @@ impl NetGame {
         }
     }
 
+    fn happening(&self, kind: &ServerEvent) -> Option<NetEvent> {
+        Some(match kind {
+            ServerEvent::Bullet(e) => NetEvent::Gunshot { kind: self.items.get(e.item_id as usize).and_then(|i| i.kind), pos: e.pos, vel: e.vel },
+            ServerEvent::BulletHit(e) => NetEvent::BulletHit { hit: e.hit_type, pos: e.pos, normal: e.normal },
+            ServerEvent::BulletHole(e) => NetEvent::BulletHole { pos: e.pos, glass: e.face != -1 },
+            ServerEvent::Explosion(e) => NetEvent::Explosion { pos: e.pos },
+            ServerEvent::UpdateVehicle(e) if e.kind == 0 => NetEvent::WindowBroke { pos: e.pos },
+            ServerEvent::Sound(e) => NetEvent::Sound { sound: e.sound_type, pos: e.pos, volume: e.volume, pitch: e.pitch },
+            ServerEvent::PhoneSound(e) => {
+                let item = self.items.get(e.item_id as usize).filter(|i| i.active)?;
+                NetEvent::Sound { sound: e.sound, pos: item.track.pos, volume: e.volume, pitch: e.pitch }
+            }
+            _ => return None,
+        })
+    }
+
     fn event(&mut self, ev: Event) {
+        let fresh = self.tick.wrapping_sub(ev.tick_created as i32) as u32 <= FRESH;
+
+        if let Some(happening) = self.happening(&ev.kind).filter(|_| fresh) {
+            self.happenings.push(happening);
+        }
+
         match ev.kind {
             ServerEvent::Chat(event) => {
-                let fresh = self.tick.wrapping_sub(ev.tick_created as i32) as u32 <= 0x63;
-
                 if fresh || matches!(event.chat_type, ChatType::EliminatorAnnouncement | ChatType::Notice) {
                     info!("chat {:?}: {}", event.chat_type, event.message);
 

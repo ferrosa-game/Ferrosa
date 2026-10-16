@@ -1,6 +1,6 @@
 use std::{
     io::{Read, Seek, SeekFrom},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use bevy::{
@@ -44,12 +44,8 @@ impl Plugin for LoadingPlugin {
     }
 }
 
-fn map_dir(name: &str) -> PathBuf {
-    Path::new("data").join(name)
-}
-
 fn read_images(map: &Map) -> Vec<Option<Vec<u8>>> {
-    let dir = map_dir(&map.map_name);
+    let dir = Path::new("data").join(map.map_name.clone());
     let mut images = vec![None, std::fs::read(dir.join("asphalt2.png")).ok(), None, None];
     let mut csx = std::fs::File::open(dir.join("test.csx")).ok();
 

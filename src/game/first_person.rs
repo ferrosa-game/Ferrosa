@@ -1,16 +1,16 @@
 use std::f32::consts::{PI, TAU};
 
 use bevy::prelude::*;
-use ferrosa_world::skeleton::{BONES, BoneId};
+use ferrosa_world::skeleton::BoneId;
 
 use super::{
     camera::GameCamera,
-    humans::{NetHuman, pose},
+    humans::{NetHuman, bone_at, pose},
     netgame::{Human, NetGame},
     network::NetTick,
     smoothing::Smoothing,
 };
-use crate::human::{HideHead, HumanPose, PARENTS};
+use crate::human::{HideHead, HumanPose};
 
 const CAMERA_TURN: f32 = 0.125;
 const MIN_TURN: f32 = 1.525_878_9e-5;
@@ -44,11 +44,7 @@ impl Plugin for FirstPersonPlugin {
 }
 
 fn head_at(pos: Vec3, pose: &HumanPose) -> (Vec3, Quat) {
-    [BoneId::Stomach, BoneId::Torso, BoneId::Head].iter().fold((pos, pose.0[0]), |(at, _), &bone| {
-        let (j, template) = (bone.index(), &BONES[bone.index()]);
-
-        (at + pose.0[PARENTS[j]] * template.joint + pose.0[j] * (template.offset - template.joint), pose.0[j])
-    })
+    bone_at(pos, pose, BoneId::Head.index())
 }
 
 fn head(h: &Human) -> (Vec3, Quat) {
