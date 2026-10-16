@@ -817,8 +817,7 @@ fn fly(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, setting
     }
 }
 
-// TODO: the chat line (Enter), the voice level (T), Tab handing the mouse to the player menus, C and M's map views,
-// and the spectator's choice of who to watch.
+// TODO: C and M's map views, and the spectator's choice of who to watch.
 fn read_input(
     mut net: ResMut<NetGame>,
     mut state: ResMut<InputState>,

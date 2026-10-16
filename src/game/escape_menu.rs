@@ -24,6 +24,7 @@ pub enum GameMenu {
     Open,
     Options,
     PlayerMenu,
+    Chat,
 }
 
 #[derive(Component, Clone, Copy)]

@@ -1,5 +1,6 @@
 use bevy::{
     gltf::{GltfAssetLabel, GltfExtras, GltfMaterialName},
+    camera::visibility::RenderLayers,
     math::Affine2,
     platform::collections::HashMap,
     prelude::*,
@@ -7,6 +8,7 @@ use bevy::{
 };
 
 pub const BONES: usize = 16;
+pub const SHADOW_ONLY: usize = 1;
 const BONE_NAMES: [&str; BONES] = [
     "Pelvis", "Stomach", "Torso", "Head", "ShoulderL", "ForearmL", "HandL", "ShoulderR", "ForearmR", "HandR", "ThighL", "ShinL", "FootL", "ThighR",
     "ShinR", "FootR",
@@ -198,12 +200,31 @@ fn part_ready(
     }
 }
 
-fn hide_heads(mut parts: Query<(Entity, &HumanPart, &mut Visibility)>, parents: Query<&ChildOf>, hiding: Query<(), With<HideHead>>) {
-    for (e, part, mut vis) in &mut parts {
-        if matches!(part, HumanPart::Head) {
-            let hide = parents.iter_ancestors(e).any(|a| hiding.contains(a));
+fn hide_heads(
+    mut commands: Commands,
+    parts: Query<(Entity, &HumanPart)>,
+    parents: Query<&ChildOf>,
+    children: Query<&Children>,
+    meshes: Query<Has<RenderLayers>, With<Mesh3d>>,
+    hiding: Query<(), With<HideHead>>,
+) {
+    for (e, part) in &parts {
+        if !matches!(part, HumanPart::Head) {
+            continue;
+        }
 
-            vis.set_if_neq(if hide { Visibility::Hidden } else { Visibility::Inherited });
+        let hide = parents.iter_ancestors(e).any(|a| hiding.contains(a));
+
+        for mesh in std::iter::once(e).chain(children.iter_descendants(e)) {
+            match (meshes.get(mesh), hide) {
+                (Ok(false), true) => {
+                    commands.entity(mesh).insert(RenderLayers::layer(SHADOW_ONLY));
+                }
+                (Ok(true), false) => {
+                    commands.entity(mesh).remove::<RenderLayers>();
+                }
+                _ => {}
+            }
         }
     }
 }

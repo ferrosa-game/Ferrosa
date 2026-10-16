@@ -1,9 +1,13 @@
 use bevy::{
+    camera::visibility::RenderLayers,
     light::{Atmosphere, CascadeShadowConfigBuilder, DirectionalLightShadowMap, GlobalAmbientLight, SunDisk, atmosphere::ScatteringMedium, light_consts::lux},
     prelude::*,
 };
 
-use crate::menu::{Screen, join::ServerSync};
+use crate::{
+    human::SHADOW_ONLY,
+    menu::{Screen, join::ServerSync},
+};
 
 const DEFAULT_SUN_ANGLE: f32 = 0.8;
 const FILL: Color = Color::srgb(1.0, 0.85, 0.65);
@@ -32,6 +36,7 @@ fn spawn_sky(mut commands: Commands, sync: Option<Res<ServerSync>>, mut media: R
 
     commands.spawn((
         DirectionalLight { illuminance: lux::RAW_SUNLIGHT, shadow_maps_enabled: true, ..default() },
+        RenderLayers::from_layers(&[0, SHADOW_ONLY]),
         SunDisk::EARTH,
         CascadeShadowConfigBuilder { first_cascade_far_bound: SHADOW_NEAR, maximum_distance: SHADOW_FAR, ..default() }.build(),
         Transform::default().looking_to(-sun, Vec3::Y),

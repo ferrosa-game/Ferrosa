@@ -110,7 +110,7 @@ fn restore_menu_camera(mut commands: Commands, mut cameras: Query<(Entity, &mut 
 
 fn capture_cursor(menu: Option<Res<State<GameMenu>>>, window: Single<(&mut Window, &mut CursorOptions)>) {
     let (mut window, mut cursor) = window.into_inner();
-    let playing = menu.is_some_and(|m| *m.get() == GameMenu::Closed);
+    let playing = menu.is_some_and(|m| matches!(m.get(), GameMenu::Closed | GameMenu::Chat));
     let grab_mode = if playing { CursorGrabMode::Locked } else { CursorGrabMode::None };
 
     if cursor.grab_mode == grab_mode && cursor.visible != playing {

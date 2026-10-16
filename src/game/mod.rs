@@ -1,5 +1,6 @@
 mod blocks;
 mod camera;
+mod chat;
 mod controls;
 mod doors;
 mod escape_menu;
@@ -54,7 +55,7 @@ impl Plugin for GamePlugin {
             vehicles::VehiclesPlugin,
             items::ItemsPlugin,
             smoothing::SmoothingPlugin,
-            (hud::HudPlugin, inventory::InventoryPlugin, paper_doll::PaperDollPlugin, doors::DoorsPlugin, sounds::SoundsPlugin),
+            (hud::HudPlugin, inventory::InventoryPlugin, paper_doll::PaperDollPlugin, doors::DoorsPlugin, sounds::SoundsPlugin, chat::ChatPlugin),
         ))
         .add_systems(Update, scale_ui.run_if(in_state(Screen::InGame)))
         .add_systems(OnExit(Screen::InGame), |mut scale: ResMut<UiScale>| scale.0 = 1.0);

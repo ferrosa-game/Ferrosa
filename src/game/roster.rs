@@ -5,6 +5,7 @@ use ferrosa_protocol::{
 };
 
 use super::{
+    escape_menu::GameMenu,
     netgame::{NetGame, Player},
     player_menu::Choice,
 };
@@ -146,12 +147,14 @@ fn roster(net: &NetGame) -> View {
 fn show_roster(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
+    menu: Option<Res<State<GameMenu>>>,
     net: Option<Res<NetGame>>,
     fonts: Res<GameFonts>,
     mut last: ResMut<Shown>,
     panels: Query<Entity, With<RosterPanel>>,
 ) {
-    let view = net.filter(|n| shown(n, keys.pressed(KEY))).map(|n| roster(&n));
+    let typing = menu.is_some_and(|m| *m.get() == GameMenu::Chat);
+    let view = net.filter(|n| shown(n, keys.pressed(KEY) && !typing)).map(|n| roster(&n));
 
     if view == last.0 {
         return;

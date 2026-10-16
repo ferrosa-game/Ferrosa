@@ -47,6 +47,7 @@ pub struct HudScreen;
 #[derive(Clone, Copy)]
 pub enum Stick {
     Centre,
+    Top,
     Bottom,
     BottomLeft,
     TopLeft,
@@ -182,6 +183,7 @@ pub fn spawn_screen(commands: &mut Commands, marker: impl Bundle, stick: Stick) 
         Stick::Bottom => (JustifyContent::Center, AlignItems::FlexEnd),
         Stick::BottomLeft => (JustifyContent::FlexStart, AlignItems::FlexEnd),
         Stick::TopLeft => (JustifyContent::FlexStart, AlignItems::FlexStart),
+        Stick::Top => (JustifyContent::Center, AlignItems::FlexStart),
     };
     let full = Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), justify_content: across, align_items: down, ..default() };
     let window = commands.spawn((full, Pickable::IGNORE, DespawnOnExit(Screen::InGame))).id();

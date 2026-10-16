@@ -37,6 +37,9 @@ const BONES: usize = 0xf;
 const TIMEOUT: u32 = 0x707;
 const STALE: i32 = 0x270f;
 const CHAT_LINES: usize = 0x40;
+const CHAT_LENGTH: usize = 0x7f;
+const LONG_CHAT: f32 = 10.0;
+const SHORT_CHAT: f32 = 8.0;
 
 #[derive(Clone, Debug)]
 pub struct Player {
@@ -290,6 +293,8 @@ pub struct ChatLine {
     pub kind: ChatType,
     pub speaker: i32,
     pub text: String,
+    pub volume: i32,
+    pub life: f32,
 }
 
 #[derive(Message, Clone, Debug)]
@@ -765,10 +770,14 @@ impl NetGame {
                 if fresh || matches!(event.chat_type, ChatType::EliminatorAnnouncement | ChatType::Notice) {
                     info!("chat {:?}: {}", event.chat_type, event.message);
 
+                    let life = if matches!(event.chat_type, ChatType::Announce | ChatType::AdminChat) { LONG_CHAT } else { SHORT_CHAT };
+
                     self.chat.push(ChatLine {
                         kind: event.chat_type,
                         speaker: event.speaker_id,
-                        text: event.message,
+                        text: event.message.chars().take(CHAT_LENGTH).collect(),
+                        volume: event.volume,
+                        life,
                     });
 
                     if self.chat.len() > CHAT_LINES {

@@ -173,7 +173,6 @@ fn spawn_vehicle(commands: &mut Commands, assets: &AssetServer, types: &VehicleT
     }
 }
 
-// TODO: the windows' glass.
 #[allow(clippy::type_complexity)]
 fn sync_vehicles(
     mut commands: Commands,
