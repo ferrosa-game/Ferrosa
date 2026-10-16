@@ -13,7 +13,11 @@ use bevy::{
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin { primary_window: Some(Window { title: "Ferrosa".into(), ..default() }), ..default() }))
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin { primary_window: Some(Window { title: "Ferrosa".into(), ..default() }), ..default() })
+                .set(AssetPlugin { file_path: "data".into(), ..default() }),
+        )
         .insert_resource(ClearColor(menu::MENU_BACKGROUND))
         .add_plugins(config::ConfigPlugin)
         .add_plugins((

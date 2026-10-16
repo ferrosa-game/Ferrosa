@@ -6,8 +6,6 @@ use bevy::{
     world_serialization::WorldInstanceReady,
 };
 
-/// The human skeleton's bones as the models' joints are named, each one's parent, and how far down from the root the
-/// pelvis hangs.
 pub const BONES: usize = 16;
 const BONE_NAMES: [&str; BONES] = [
     "Pelvis", "Stomach", "Torso", "Head", "ShoulderL", "ForearmL", "HandL", "ShoulderR", "ForearmR", "HandR", "ThighL", "ShinL", "FootL", "ThighR",
@@ -15,13 +13,9 @@ const BONE_NAMES: [&str; BONES] = [
 ];
 const PARENTS: [usize; BONES] = [0, 0, 1, 2, 2, 4, 5, 2, 7, 8, 0, 10, 11, 0, 13, 14];
 const PELVIS_DROP: Vec3 = Vec3::new(0.0, -0.125, 0.0);
-/// Where a body's head and hair go.
 const HEAD_MOUNT: &str = "HeadMount";
-/// How many head and hair styles each gender has (fhead1..5, fhair1..9 and the same for men).
 pub const HEADS: usize = 5;
 pub const HAIRS: usize = 9;
-/// The skinned model slots and the models init_game_resources loads into them: women's bodies from 0, men's from 8,
-/// ties from 0x10 and necklaces from 0x14, two per gender.
 const MODEL_SLOTS: usize = 0x18;
 const MODEL_FILES: [(usize, &str); 12] = [
     (0, "fcasual1"),
@@ -37,12 +31,9 @@ const MODEL_FILES: [(usize, &str); 12] = [
     (0x16, "mnecklace1"),
     (0x17, "mnecklace4"),
 ];
-/// The palette has sixteen colour columns.
+
 const COLUMNS: f32 = 16.0;
 
-/// How a human looks, as the server describes it: gender (0 a woman, 1 a man), head and hair styles, the palette
-/// columns of its skin, hair and eyes, its clothes (model 0 casual, 1 and 2 a suit) and their colour, its tie's
-/// colour plus one (0 for none) and its necklace (0 for none).
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[require(Transform, Visibility)]
 pub struct HumanLook {
@@ -59,12 +50,10 @@ pub struct HumanLook {
 }
 
 impl HumanLook {
-    /// What the look's models are, apart from their colours.
     fn shape(&self) -> (u32, u32, bool, u32, u32, u32) {
         (self.gender, self.model, self.tie_colour > 0, self.necklace, self.head, self.hair)
     }
 
-    /// The palette column of a colour slot: skin, suit, tie, hair or eyes.
     fn column(&self, slot: &str) -> Option<u32> {
         Some(match slot {
             "skin" => self.skin_colour,
@@ -77,7 +66,6 @@ impl HumanLook {
     }
 }
 
-/// How a human's bones are turned, each by its own turn (not its parent's); all upright by default.
 #[derive(Component, Clone, Copy, Debug, PartialEq)]
 pub struct HumanPose(pub [Quat; BONES]);
 
@@ -87,14 +75,11 @@ impl Default for HumanPose {
     }
 }
 
-/// How low a human reaches below its root standing upright (from its body model), to stand it on something.
 #[derive(Component, Clone, Copy, Debug, Default)]
 pub struct HumanExtent {
     pub lowest: f32,
 }
 
-/// A model a human is made of: its body (which carries the head and hair once it has spawned), a tie or necklace,
-/// or the head and hair themselves.
 #[derive(Component, Clone, Debug)]
 enum HumanPart {
     Body { head: Option<String>, hair: Option<String> },
@@ -102,28 +87,21 @@ enum HumanPart {
     Head,
 }
 
-/// The models a human was built from, so a change of colour alone doesn't rebuild it.
 #[derive(Component, PartialEq)]
 struct BuiltShape((u32, u32, bool, u32, u32, u32));
 
-/// A part's joints, by bone, once its model has spawned.
 #[derive(Component)]
 struct Joints([Entity; BONES]);
 
-/// A mesh in one of the palette's colour slots, and the model's own material for it.
 #[derive(Component)]
 struct SlotMaterial {
     slot: String,
     base: Handle<StandardMaterial>,
 }
 
-/// The slot materials made for each colour, shared by every human wearing it.
 #[derive(Resource, Default)]
 struct ColouredMaterials(HashMap<(AssetId<StandardMaterial>, u32), Handle<StandardMaterial>>);
 
-/// Humans: any entity with a [`HumanLook`] gets its body, tie, necklace, head and hair (assets/models/*.glb) under
-/// it, coloured from its look and posed by its [`HumanPose`] (upright if it has none), the skeleton's root at the
-/// entity.
 pub struct HumanPlugin;
 
 impl Plugin for HumanPlugin {
@@ -138,8 +116,6 @@ fn model(assets: &AssetServer, name: &str) -> WorldAssetRoot {
     WorldAssetRoot(assets.load(GltfAssetLabel::Scene(0).from_asset(format!("models/{name}.glb"))))
 }
 
-/// body_models: the models of a human's body (its clothes for its gender), its tie if it wears one and its necklace
-/// if it wears one.
 fn body_models(look: &HumanLook) -> [Option<&'static str>; 3] {
     let kind = if look.model == 2 || look.model == 3 { look.model as usize } else { (look.model == 1) as usize };
     let body = kind + if look.gender == 1 { 8 } else { 0 };
@@ -148,8 +124,6 @@ fn body_models(look: &HumanLook) -> [Option<&'static str>; 3] {
     [Some(body), tie, necklace].map(|s| s.filter(|&s| s < MODEL_SLOTS).and_then(|s| MODEL_FILES.iter().find(|f| f.0 == s).map(|f| f.1)))
 }
 
-/// A human whose models changed has its parts replaced: the body (which brings the head and hair when it is ready),
-/// then its tie and necklace.
 fn build_humans(
     mut commands: Commands,
     assets: Res<AssetServer>,
@@ -178,8 +152,6 @@ fn build_humans(
     }
 }
 
-/// A part's model has spawned: its joints are found for posing, its colour-slot meshes noted, a body's standing
-/// height given to its human, and a body's head and hair put on its head mount.
 fn part_ready(
     ready: On<WorldInstanceReady>,
     mut commands: Commands,
@@ -223,7 +195,6 @@ fn part_ready(
     }
 }
 
-/// The `"lowest"` number in a node's extras.
 fn lowest(extras: &str) -> Option<f32> {
     let rest = &extras[extras.find("\"lowest\"")? + "\"lowest\"".len()..];
     let rest = rest.trim_start().strip_prefix(':')?.trim_start();
@@ -231,8 +202,6 @@ fn lowest(extras: &str) -> Option<f32> {
     rest[..end].parse().ok()
 }
 
-/// The world shader's colour slots: each slot mesh of a human gets its model's material moved along the palette to
-/// the human's colour for that slot, when it appears or the human's colours change.
 fn colour_humans(
     humans: Query<(Entity, &HumanLook)>,
     changed: Query<(), Changed<HumanLook>>,
@@ -265,8 +234,6 @@ fn colour_humans(
     }
 }
 
-/// bone_uniforms through the models' joints: each joint turned by its bone's turn less its parent's (the pose gives
-/// each bone's own), and the pelvis hung from the root turned by its own.
 fn pose_humans(
     humans: Query<Ref<HumanPose>>,
     parts: Query<(&ChildOf, Ref<Joints>)>,

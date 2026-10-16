@@ -1,4 +1,4 @@
-//! The Sub Rosa GUI's widgets (ferrosa-gui) as Bevy UI: labels, buttons, checkboxes, radio buttons, integer sliders,
+//! The Ferrosa GUI's widgets (ferrosa-gui) as Bevy UI: labels, buttons, checkboxes, radio buttons, integer sliders,
 //! text, password, number and float inputs, list boxes, spinners and windows. Each is spawned under a parent and
 //! reports through Bevy's widget events on the entity returned: [`Activate`] for buttons, [`ValueChange`] for the
 //! rest (`bool` checkboxes, the chosen button's `Entity` on a radio group, `f32` sliders, `String` text inputs,
