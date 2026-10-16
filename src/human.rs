@@ -11,7 +11,7 @@ const BONE_NAMES: [&str; BONES] = [
     "Pelvis", "Stomach", "Torso", "Head", "ShoulderL", "ForearmL", "HandL", "ShoulderR", "ForearmR", "HandR", "ThighL", "ShinL", "FootL", "ThighR",
     "ShinR", "FootR",
 ];
-const PARENTS: [usize; BONES] = [0, 0, 1, 2, 2, 4, 5, 2, 7, 8, 0, 10, 11, 0, 13, 14];
+pub const PARENTS: [usize; BONES] = [0, 0, 1, 2, 2, 4, 5, 2, 7, 8, 0, 10, 11, 0, 13, 14];
 const PELVIS_DROP: Vec3 = Vec3::new(0.0, -0.125, 0.0);
 const HEAD_MOUNT: &str = "HeadMount";
 pub const HEADS: usize = 5;
@@ -66,6 +66,9 @@ impl HumanLook {
     }
 }
 
+#[derive(Component)]
+pub struct HideHead;
+
 #[derive(Component, Clone, Copy, Debug, PartialEq)]
 pub struct HumanPose(pub [Quat; BONES]);
 
@@ -107,7 +110,7 @@ pub struct HumanPlugin;
 impl Plugin for HumanPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ColouredMaterials>()
-            .add_systems(Update, (build_humans, colour_humans).chain())
+            .add_systems(Update, (build_humans, colour_humans, hide_heads).chain())
             .add_systems(PostUpdate, pose_humans.before(TransformSystems::Propagate));
     }
 }
@@ -191,6 +194,16 @@ fn part_ready(
     if let (HumanPart::Body { head, hair }, Some(mount)) = (kind, mount) {
         for name in [head, hair].into_iter().flatten() {
             commands.spawn((model(&assets, name), HumanPart::Head, ChildOf(mount))).observe(part_ready);
+        }
+    }
+}
+
+fn hide_heads(mut parts: Query<(Entity, &HumanPart, &mut Visibility)>, parents: Query<&ChildOf>, hiding: Query<(), With<HideHead>>) {
+    for (e, part, mut vis) in &mut parts {
+        if matches!(part, HumanPart::Head) {
+            let hide = parents.iter_ancestors(e).any(|a| hiding.contains(a));
+
+            vis.set_if_neq(if hide { Visibility::Hidden } else { Visibility::Inherited });
         }
     }
 }

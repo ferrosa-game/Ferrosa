@@ -1,4 +1,6 @@
 mod config;
+mod fonts;
+mod game;
 mod human;
 mod masterserver;
 mod menu;
@@ -19,12 +21,13 @@ fn main() {
                 .set(AssetPlugin { file_path: "data".into(), ..default() }),
         )
         .insert_resource(ClearColor(menu::MENU_BACKGROUND))
-        .add_plugins(config::ConfigPlugin)
+        .add_plugins((config::ConfigPlugin, fonts::FontsPlugin))
         .add_plugins((
             masterserver::MasterServerPlugin,
             ui::UiPlugin,
             menu::MenuPlugin,
-            human::HumanPlugin
+            human::HumanPlugin,
+            game::GamePlugin,
         ))
         .add_systems(Startup, |mut commands: Commands| {
             commands.spawn((Camera2d, IsDefaultUiCamera));
@@ -33,7 +36,6 @@ fn main() {
         .run();
 }
 
-/// SCREENSHOT=<file.png>: the window saved SCREENSHOT_SECS seconds in (one by default), then the app closes.
 fn screenshot_and_quit(mut commands: Commands, time: Res<Time<Real>>, mut taken: Local<Option<f32>>) {
     let Ok(path) = std::env::var("SCREENSHOT") else { return };
 
@@ -51,4 +53,3 @@ fn screenshot_and_quit(mut commands: Commands, time: Res<Time<Real>>, mut taken:
         _ => {}
     }
 }
-

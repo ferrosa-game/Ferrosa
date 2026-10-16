@@ -1,5 +1,6 @@
 use bevy::{prelude::*, ui_widgets::{Activate, ValueChange}};
 use ferrosa_protocol::{
+    GameMode,
     clientbound::{initial_sync::InitialSync, kick::KickClient},
     codec::{Reader, WireRead},
     frame_packet,
@@ -8,6 +9,7 @@ use ferrosa_protocol::{
 };
 
 use crate::{
+    game::netgame::NetGame,
     masterserver::{MasterAuth, PlayerName},
     menu::{Screen, character::PlayerLook, gap, page, servers::JoinTarget, text},
     net::ClientSocket,
@@ -46,7 +48,7 @@ impl Join {
 #[derive(Resource, Clone, Debug)]
 pub struct ServerSync {
     pub round: u32,
-    pub game_type: u32,
+    pub game_type: GameMode,
     pub weekly: bool,
     pub weekday: u32,
     pub map: String,
@@ -65,7 +67,7 @@ impl From<InitialSync> for ServerSync {
     fn from(s: InitialSync) -> Self {
         Self {
             round: s.round_number,
-            game_type: s.gamemode as u32,
+            game_type: s.gamemode,
             weekly: s.weekly_enabled,
             weekday: s.weekday as u32,
             map: s.map_name,
@@ -130,6 +132,7 @@ fn join_server(
     name: Option<Res<PlayerName>>,
     look: Res<PlayerLook>,
     mut socket: ResMut<ClientSocket>,
+    mut next: ResMut<NextState<Screen>>,
 ) {
     let (Some(target), Some(mut join), Some(master)) = (target, join, master) else { return };
 
@@ -184,10 +187,11 @@ fn join_server(
             Ok(6) => {
                 let Ok(sync) = InitialSync::read(&mut r) else { continue };
                 let sync = ServerSync::from(sync);
-                info!("joined {} on {} (game type {})", target.name, sync.map, sync.game_type);
+                info!("joined {} on {} ({:?})", target.name, sync.map, sync.game_type);
+                commands.insert_resource(NetGame::new(target.addr, sync.clone()));
                 commands.insert_resource(sync);
                 join.state = JoinState::Joined;
-                // TODO: loading the level and starting the network game (start_game).
+                next.set(Screen::Loading);
                 break;
             }
             Ok(3) => {

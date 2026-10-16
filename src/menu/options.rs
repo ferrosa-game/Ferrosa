@@ -9,7 +9,7 @@ use cpal::traits::{DeviceTrait, HostTrait};
 
 use crate::{
     config::{Config, config_path},
-    menu::{Screen, back_button, page, text},
+    menu::{Screen, back_button, text},
     ui::{self, Shortcut},
 };
 
@@ -19,8 +19,11 @@ const HEADING: Color = Color::srgb(0.75, 0.75, 0.75);
 
 type Flag = fn(&mut Config) -> &mut i32;
 
+#[derive(Component)]
+pub struct OptionsPage;
+
 #[derive(Resource)]
-struct AudioDevices {
+pub struct AudioDevices {
     output: Vec<String>,
     input: Vec<String>,
     chosen_output: usize,
@@ -45,9 +48,9 @@ impl Plugin for OptionsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<VoiceBinding>()
             .add_systems(Startup, (apply_window_settings, list_audio_devices))
-            .add_systems(OnEnter(Screen::Options), options)
-            .add_systems(OnExit(Screen::Options), |mut binding: ResMut<VoiceBinding>| binding.waiting = false)
-            .add_systems(Update, (bind_voice_key, show_voice_settings).run_if(in_state(Screen::Options)));
+            .add_systems(OnEnter(Screen::Options), options_screen)
+            .add_systems(Update, (bind_voice_key, show_voice_settings).run_if(any_with_component::<OptionsPage>))
+            .add_observer(|_: On<Remove<OptionsPage>>, mut binding: ResMut<VoiceBinding>| binding.waiting = false);
     }
 }
 
@@ -115,8 +118,32 @@ fn heading(commands: &mut Commands, parent: Entity, s: &str) {
     commands.spawn((Text::new(s), TextFont::from_font_size(18.0), TextColor(HEADING), Node { margin: UiRect::top(px(12)), ..default() }, ChildOf(parent)));
 }
 
-fn options(mut commands: Commands, config: Res<Config>, devices: Res<AudioDevices>) {
-    let p = page(&mut commands, Screen::Options);
+fn options_screen(mut commands: Commands, config: Res<Config>, devices: Res<AudioDevices>) {
+    let p = spawn_options(&mut commands, &config, &devices);
+
+    commands.entity(p).insert(DespawnOnExit(Screen::Options));
+
+    back_button(&mut commands, p);
+}
+
+pub fn spawn_options(commands: &mut Commands, config: &Config, devices: &AudioDevices) -> Entity {
+    let p = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                height: percent(100),
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                row_gap: px(8),
+                ..default()
+            },
+            OptionsPage,
+        ))
+        .id();
+
+    let mut commands = commands.reborrow();
+
     text(&mut commands, p, "Options", 32.0, Color::WHITE);
 
     let columns = commands.spawn((Node { column_gap: px(COLUMN_GAP), margin: UiRect::top(px(16)), ..default() }, ChildOf(p))).id();
@@ -125,26 +152,26 @@ fn options(mut commands: Commands, config: Res<Config>, devices: Res<AudioDevice
 
     heading(&mut commands, left, "Display");
 
-    let fullscreen = flag(&mut commands, left, "Fullscreen", &config, |c| &mut c.fullscreen);
+    let fullscreen = flag(&mut commands, left, "Fullscreen", config, |c| &mut c.fullscreen);
     commands.entity(fullscreen).observe(|v: On<ValueChange<bool>>, mut windows: Query<&mut Window, With<PrimaryWindow>>| {
         for mut window in &mut windows {
             window.mode = window_mode(v.value);
         }
     });
 
-    let sync = flag(&mut commands, left, "V-Sync", &config, |c| &mut c.vertical_sync);
+    let sync = flag(&mut commands, left, "V-Sync", config, |c| &mut c.vertical_sync);
     commands.entity(sync).observe(|v: On<ValueChange<bool>>, mut windows: Query<&mut Window, With<PrimaryWindow>>| {
         for mut window in &mut windows {
             window.present_mode = present_mode(v.value);
         }
     });
 
-    flag(&mut commands, left, "Frame Smoothing", &config, |c| &mut c.frame_smoothing);
-    flag(&mut commands, left, "Sprite Models", &config, |c| &mut c.sprite_models);
+    flag(&mut commands, left, "Frame Smoothing", config, |c| &mut c.frame_smoothing);
+    flag(&mut commands, left, "Sprite Models", config, |c| &mut c.sprite_models);
 
     heading(&mut commands, left, "Controls");
-    flag(&mut commands, left, "Invert Mouse", &config, |c| &mut c.invert_mouse);
-    flag(&mut commands, left, "Use advanced inventory", &config, |c| &mut c.manual_hands);
+    flag(&mut commands, left, "Invert Mouse", config, |c| &mut c.invert_mouse);
+    flag(&mut commands, left, "Use advanced inventory", config, |c| &mut c.manual_hands);
 
     heading(&mut commands, left, "Network");
     number(&mut commands, left, "Port", config.port, (0, 0xffff), |c| &mut c.port);
@@ -171,7 +198,7 @@ fn options(mut commands: Commands, config: Res<Config>, devices: Res<AudioDevice
     commands.entity(input).observe(|v: On<ValueChange<usize>>, mut devices: ResMut<AudioDevices>| devices.chosen_input = v.value);
 
     heading(&mut commands, right, "Voice");
-    flag(&mut commands, right, "Use Push to Talk", &config, |c| &mut c.voice_hold_to_talk);
+    flag(&mut commands, right, "Use Push to Talk", config, |c| &mut c.voice_hold_to_talk);
     let min_row = commands.spawn((Node::default(), VoiceMinRow, ChildOf(right))).id();
     number(&mut commands, min_row, "Voice Min", config.voice_min, (0x10, 0x4000), |c| &mut c.voice_min);
     let row = commands.spawn((Node { align_items: AlignItems::Center, column_gap: px(6), ..default() }, ChildOf(right))).id();
@@ -179,7 +206,7 @@ fn options(mut commands: Commands, config: Res<Config>, devices: Res<AudioDevice
     commands.entity(key).insert(VoiceKeyButton).observe(start_binding);
     ui::label(&mut commands, row, "Voice Key", ui::TEXT_SIZE, Color::WHITE);
 
-    back_button(&mut commands, p);
+    p
 }
 
 fn start_binding(_: On<Activate>, mut binding: ResMut<VoiceBinding>, shortcuts: Query<(Entity, &Shortcut)>, mut commands: Commands) {
@@ -295,7 +322,6 @@ fn copy_system_info(_: On<Activate>, adapter: Option<Res<RenderAdapterInfo>>, mu
     }
 }
 
-// This shit is needed to maintain compat with Sub Rosa, because it uses SDL2 (archaic)
 fn scancode(key: KeyCode) -> Option<i32> {
     const LETTERS: [KeyCode; 26] = [
         KeyCode::KeyA, KeyCode::KeyB, KeyCode::KeyC, KeyCode::KeyD, KeyCode::KeyE, KeyCode::KeyF, KeyCode::KeyG, KeyCode::KeyH, KeyCode::KeyI,

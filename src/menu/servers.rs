@@ -81,7 +81,7 @@ impl ServerEntry {
     }
 
     fn joinable(&self) -> bool {
-        self.version == 38 as i32
+        self.version == 38_i32
     }
 }
 

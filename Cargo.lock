@@ -891,6 +891,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_enhanced_input"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b73cd17d91a012b24e3985fd3af736f61c3ad4919b542e40be5cfecd6333d6c"
+dependencies = [
+ "bevy",
+ "bevy_enhanced_input_macros",
+ "bitflags 2.13.2",
+ "smallvec",
+ "variadics_please",
+]
+
+[[package]]
+name = "bevy_enhanced_input_macros"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b328604b1e3330b1798d82eeeabfefdf490c2c78d53ffc5d0961fd147b953126"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.9",
+]
+
+[[package]]
 name = "bevy_extract"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1299,7 +1323,7 @@ dependencies = [
  "approx",
  "bevy_reflect",
  "derive_more",
- "glam 0.33.12",
+ "glam",
  "libm",
  "rand",
  "serde",
@@ -1328,7 +1352,7 @@ dependencies = [
  "bytemuck",
  "derive_more",
  "encase",
- "glam 0.33.12",
+ "glam",
  "half",
  "hexasphere",
  "serde",
@@ -1485,7 +1509,7 @@ dependencies = [
  "downcast-rs 2.0.2",
  "erased-serde",
  "foldhash 0.2.0",
- "glam 0.33.12",
+ "glam",
  "indexmap",
  "inventory",
  "petgraph",
@@ -1550,7 +1574,7 @@ dependencies = [
  "derive_more",
  "downcast-rs 2.0.2",
  "encase",
- "glam 0.33.12",
+ "glam",
  "image",
  "indexmap",
  "itertools 0.14.0",
@@ -2472,6 +2496,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam-deque"
+version = "0.8.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "622f3fc73690be383c7214310406f28a90e6edeadc3cea882f9d71e495b9711a"
+dependencies = [
+ "crossbeam-epoch",
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-epoch"
+version = "0.9.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc74980687109a3b14c72fd458107bf0baa1da1a1a805e178d15501ba9b86d9d"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "crossbeam-queue"
 version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2748,7 +2791,7 @@ name = "ferrosa-map"
 version = "0.1.3"
 dependencies = [
  "binrw",
- "glam 0.34.1",
+ "glam",
  "gltf",
  "rand",
  "serde",
@@ -2756,12 +2799,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "ferrosa-physics"
+version = "0.1.3"
+dependencies = [
+ "glam",
+ "rayon",
+]
+
+[[package]]
 name = "ferrosa-protocol"
 version = "0.1.3"
 dependencies = [
  "bitflags 2.13.2",
- "glam 0.34.1",
+ "glam",
  "reqwest",
+ "serde",
+]
+
+[[package]]
+name = "ferrosa-world"
+version = "0.1.3"
+dependencies = [
+ "ferrosa-map",
+ "ferrosa-physics",
+ "ferrosa-protocol",
+ "glam",
+ "rayon",
  "serde",
 ]
 
@@ -3056,15 +3119,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "glam"
-version = "0.34.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc148d4ddd3930c52f9e5ae79b89805c6f07e9ff417e7b083e0348cea60a5aba"
-dependencies = [
- "serde_core",
-]
-
-[[package]]
 name = "glob"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3259,7 +3313,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "163385eff5a0cf606ebe2c10b3a44ab02f4306e83fbd068a64f5e1d72a3049ac"
 dependencies = [
  "constgebra",
- "glam 0.33.12",
+ "glam",
  "tinyvec",
 ]
 
@@ -4115,10 +4169,12 @@ name = "new_client"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_enhanced_input",
  "binrw",
  "cpal",
  "ferrosa-map",
  "ferrosa-protocol",
+ "ferrosa-world",
  "rand",
  "steamworks",
  "sysinfo",
@@ -5068,6 +5124,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "rayon"
+version = "1.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb39b166781f92d482534ef4b4b1b2568f42613b53e5b6c160e24cfbfa30926d"
+dependencies = [
+ "either",
+ "rayon-core",
+]
+
+[[package]]
+name = "rayon-core"
+version = "1.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22e18b0f0062d30d4230b2e85ff77fdfe4326feb054b9783a3460d8435c8ab91"
+dependencies = [
+ "crossbeam-deque",
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "read-fonts"
 version = "0.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5277,9 +5353,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-native-certs"
-version = "0.8.5"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a073f5dc7469f984c52ad2752b63b0807745133b6de880b7b64c1ac4c48aec4"
+checksum = "dab5152771c58876a2146916e53e35057e1a4dfa2b9df0f0305b07f611fdea4d"
 dependencies = [
  "openssl-probe",
  "rustls-pki-types",

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 bevy = "0.20"
+bevy_enhanced_input = "0.27"
 steamworks = { version = "0.13.1", features = ["raw-bindings"] }
 rand = "0.10"
 cpal = "0.17.3"
@@ -12,6 +13,7 @@ sysinfo = { version = "0.39.6", default-features = false, features = ["system"] 
 tokio = { version = "1", features = ["rt", "time"] }
 ferrosa-protocol = { path = "../new_server/crates/ferrosa-protocol" }
 ferrosa-map = { path = "../new_server/crates/ferrosa-map" }
+ferrosa-world = { path = "../new_server/crates/ferrosa-world" }
 binrw = "0.15.0"
 
 [profile.dev]

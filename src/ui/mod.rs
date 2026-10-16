@@ -1,9 +1,3 @@
-//! The Ferrosa GUI's widgets (ferrosa-gui) as Bevy UI: labels, buttons, checkboxes, radio buttons, integer sliders,
-//! text, password, number and float inputs, list boxes, spinners and windows. Each is spawned under a parent and
-//! reports through Bevy's widget events on the entity returned: [`Activate`] for buttons, [`ValueChange`] for the
-//! rest (`bool` checkboxes, the chosen button's `Entity` on a radio group, `f32` sliders, `String` text inputs,
-//! `i32`/`f32` number inputs once entered, `usize` list boxes and spinners).
-
 use bevy::{
     input::keyboard::KeyboardInput,
     input_focus::{FocusedInput, InputFocus, tab_navigation::TabIndex},
@@ -12,7 +6,7 @@ use bevy::{
     ,
     prelude::*,
     text::{EditableText, EditableTextFilter, TextEditChange},
-    ui::{Checked, Pressed, Selected},
+    ui::{Checked, InteractionDisabled, Pressed, Selected},
     ui_widgets::{
         Activate, Button, ControlOrientation, ListBox, ListItem, RadioButton,
         ScrollArea, Scrollbar, ScrollbarThumb, SelectAllOnFocus, Slider, TextInput, ValueChange, listbox_update_selection,
@@ -36,6 +30,7 @@ const BUTTON: Color = Color::srgb(0.12, 0.16, 0.2);
 const BUTTON_HOVERED: Color = Color::srgb(0.22, 0.28, 0.34);
 const BUTTON_PRESSED: Color = Color::srgb(0.3, 0.38, 0.46);
 const BUTTON_CHECKED: Color = Color::srgb(0.32, 0.42, 0.52);
+const BUTTON_DISABLED: Color = Color::srgb(0.08, 0.09, 0.1);
 const FIELD: Color = Color::srgba(0.1875, 0.1875, 0.1875, 0.5);
 const FIELD_HOVERED: Color = Color::srgba(0.3125, 0.3125, 0.3125, 0.5);
 const TRACK: Color = Color::srgb(0.25, 0.25, 0.25);
@@ -293,7 +288,7 @@ fn report_row(picked: On<ValueChange<Entity>>, rows: Query<&ListRow>, mut comman
     }
 }
 
-fn shortcuts(keys: Res<ButtonInput<KeyCode>>, focus: Res<InputFocus>, inputs: Query<(), With<TextInput>>, buttons: Query<(Entity, &Shortcut)>, mut commands: Commands) {
+fn shortcuts(keys: Res<ButtonInput<KeyCode>>, focus: Res<InputFocus>, inputs: Query<(), With<TextInput>>, buttons: Query<(Entity, &Shortcut), Without<InteractionDisabled>>, mut commands: Commands) {
     if focus.get().is_some_and(|f| inputs.contains(f)) {
         return;
     }
@@ -304,9 +299,11 @@ fn shortcuts(keys: Res<ButtonInput<KeyCode>>, focus: Res<InputFocus>, inputs: Qu
     }
 }
 
-fn button_colours(mut buttons: Query<(&Hovered, Has<Pressed>, Has<Checked>, &mut BackgroundColor), Or<(With<Button>, With<RadioButton>)>>) {
-    for (hovered, pressed, checked, mut colour) in &mut buttons {
-        let want = if pressed {
+fn button_colours(mut buttons: Query<(&Hovered, Has<Pressed>, Has<Checked>, Has<InteractionDisabled>, &mut BackgroundColor), Or<(With<Button>, With<RadioButton>)>>) {
+    for (hovered, pressed, checked, disabled, mut colour) in &mut buttons {
+        let want = if disabled {
+            BUTTON_DISABLED
+        } else if pressed {
             BUTTON_PRESSED
         } else if checked {
             BUTTON_CHECKED

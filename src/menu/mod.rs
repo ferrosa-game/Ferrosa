@@ -22,6 +22,8 @@ pub enum Screen {
     HostGame,
     Character,
     Connecting,
+    Loading,
+    InGame,
 }
 
 pub const MENU_BACKGROUND: Color = Color::srgb(0.035, 0.063, 0.082);
