@@ -148,7 +148,7 @@ pub fn road_markings(asphalt: &Pixels, layer: usize) -> Pixels {
 
     for y in 0..h {
         for x in 0..w {
-            if let Some(c) = marking(layer, (y * 0x80 / h) as i32, (x * 0x80 / w) as i32) {
+            if let Some(c) = marking(layer, 0x7f - (y * 0x80 / h) as i32, (x * 0x80 / w) as i32) {
                 rgba[((y * w + x) * 4) as usize..][..3].copy_from_slice(&c);
             }
         }

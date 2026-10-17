@@ -7,7 +7,7 @@ use ferrosa_protocol::{
 };
 
 use super::{
-    GAME_SCREEN,
+    GAME_FPS, GAME_SCREEN,
     controls::{InputState, flag},
     escape_menu::GameMenu,
     items::ItemTypes,
@@ -33,6 +33,7 @@ const AIM_PIVOT: Vec2 = Vec2::new(608.0, 352.0);
 const AIM_LIMITS: [Vec2; 2] = [Vec2::new(578.435_85, 327.508_27), Vec2::new(578.435_85, 376.491_73)];
 const AIM_NEEDLE: f32 = 64.0;
 const CORPORATION_MENUS: std::ops::RangeInclusive<i32> = 0xe..=0x1a;
+const TIMER_AT: Vec2 = Vec2::new(1020.0, 4.0);
 
 pub mod align {
     pub const CENTRE_X: u32 = 1;
@@ -54,6 +55,7 @@ pub enum Stick {
     Bottom,
     BottomLeft,
     TopLeft,
+    TopRight,
 }
 
 #[derive(Component)]
@@ -76,6 +78,12 @@ struct StaminaMax;
 
 #[derive(Component)]
 struct GearText;
+
+#[derive(Component)]
+struct TimerScreen;
+
+#[derive(Component)]
+struct RoundTimer;
 
 #[derive(Component)]
 struct MenuLine;
@@ -119,7 +127,7 @@ impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(Screen::InGame), spawn_hud).add_systems(
             Update,
-            (show_hud, (show_status, show_menu_line, show_phone_help, show_crosshair, show_aim, show_gauges, fade_for_damage).run_if(resource_exists::<NetGame>)).chain().run_if(in_state(Screen::InGame)),
+            (show_hud, (show_status, show_menu_line, show_phone_help, show_crosshair, show_aim, show_gauges, fade_for_damage, show_timer).run_if(resource_exists::<NetGame>)).chain().run_if(in_state(Screen::InGame)),
         );
     }
 }
@@ -190,6 +198,7 @@ pub fn spawn_screen(commands: &mut Commands, marker: impl Bundle, stick: Stick) 
         Stick::BottomLeft => (JustifyContent::FlexStart, AlignItems::FlexEnd),
         Stick::TopLeft => (JustifyContent::FlexStart, AlignItems::FlexStart),
         Stick::Top => (JustifyContent::Center, AlignItems::FlexStart),
+        Stick::TopRight => (JustifyContent::FlexEnd, AlignItems::FlexStart),
     };
     let full = Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), justify_content: across, align_items: down, ..default() };
     let window = commands.spawn((full, Pickable::IGNORE, DespawnOnExit(Screen::InGame))).id();
@@ -237,6 +246,10 @@ fn spawn_hud(mut commands: Commands, fonts: Res<GameFonts>) {
 
     spawn_gauges(&mut commands, bottom, &fonts.rockwell);
 
+    let top_right = spawn_screen(&mut commands, TimerScreen, Stick::TopRight);
+    let (node, shift) = anchored(align::RIGHT, TIMER_AT);
+    commands.spawn((node, shift, RoundTimer, text("", &fonts.osd_white, 24.0, white), ChildOf(top_right)));
+
     let full = Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), ..default() };
     commands.spawn((full, DamageFade, BackgroundColor(Color::NONE), GlobalZIndex(DAMAGE_LAYER), Pickable::IGNORE, DespawnOnExit(Screen::InGame)));
 }
@@ -247,6 +260,30 @@ fn fade_for_damage(net: Res<NetGame>, mut fade: Single<&mut BackgroundColor, Wit
 
     if fade.0 != colour {
         fade.0 = colour;
+    }
+}
+
+fn clock(ticks: i32) -> String {
+    let seconds = ticks.max(0) / GAME_FPS as i32;
+
+    format!("{}:{:02}", seconds / 60, seconds % 60)
+}
+
+fn show_timer(net: Res<NetGame>, mut screen: Single<&mut Visibility, With<TimerScreen>>, mut timer: Single<&mut Text, With<RoundTimer>>) {
+    let timer_ticks = net.timer as i32;
+    let shown_text = match (net.sync.game_type, net.game_state) {
+        (GameMode::Round | GameMode::Eliminator, GameState::Idle | GameState::Intermission) => Some(format!("Start: {}", clock(timer_ticks))),
+        (GameMode::Round | GameMode::Eliminator, GameState::InGame) => Some(clock(timer_ticks)),
+        (GameMode::Round | GameMode::Eliminator, GameState::Restarting) => Some(format!("Restart: {}", clock(timer_ticks))),
+        _ => None,
+    };
+
+    shown(&mut screen, shown_text.is_some());
+
+    if let Some(s) = shown_text
+        && timer.0 != s
+    {
+        timer.0 = s;
     }
 }
 
