@@ -817,7 +817,7 @@ fn fly(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, setting
     }
 }
 
-// TODO: C and M's map views, and the spectator's choice of who to watch.
+// TODO: C and M's map views.
 fn read_input(
     mut net: ResMut<NetGame>,
     mut state: ResMut<InputState>,

@@ -95,7 +95,7 @@ fn hash_noise(x: i32, y: i32) -> f32 {
     1.0 - k as f32 * 9.313_226e-10
 }
 
-fn cosine_noise(mask: i32, x: f32, y: f32) -> f32 {
+pub fn cosine_noise(mask: i32, x: f32, y: f32) -> f32 {
     let lerp = |a: f32, b: f32, t: f32| {
         let f = ((1.0 - (t as f64 * std::f64::consts::PI).cos()) * 0.5) as f32;
         (1.0 - f) * a + f * b
@@ -140,6 +140,19 @@ fn marking(layer: usize, row: i32, col: i32) -> Option<[u8; 3]> {
         || (layer == 8 && (span(col, 16, 15) || span(col, 96, 15)));
 
     if yellow { Some(YELLOW) } else if white { Some(WHITE) } else { None }
+}
+
+pub fn particle() -> Pixels {
+    let rgba = (0..0x80)
+        .flat_map(|i: i32| (0..0x80).map(move |j: i32| (i, j)))
+        .flat_map(|(i, j)| {
+            let (dx, dy) = ((0x40 - j) as f32, (0x40 - i) as f32);
+            let noise = cosine_noise(-1, 0.125 * j as f32 * 0.5, i as f32 * 0.125 * 0.5);
+            [0xff, 0xff, 0xff, if noise * 6.0 + 48.0 > (dx * dx + dy * dy).sqrt() { 0xc0 } else { 0 }]
+        })
+        .collect();
+
+    Pixels { width: 0x80, height: 0x80, rgba }
 }
 
 pub fn road_markings(asphalt: &Pixels, layer: usize) -> Pixels {

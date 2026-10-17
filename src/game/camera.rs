@@ -9,17 +9,22 @@ use bevy::{
     prelude::*,
     window::{CursorGrabMode, CursorOptions},
 };
-use ferrosa_world::{map::Map, track::Track};
+use ferrosa_world::{map::Map, skeleton::BoneId, track::Track};
 
 use bevy_enhanced_input::prelude::Action;
+use ferrosa_protocol::GameMode;
 
 use super::{
     GAME_FPS, Level,
     controls::{Fly, FlyFast, FlyLook, FlySlow, FlyZoom},
     escape_menu::GameMenu,
     first_person::FirstPerson,
+    humans::{NetHuman, bone_at},
+    netgame::NetGame,
+    smoothing::Smoothing,
+    spectating::spectates,
 };
-use crate::{config::Config, menu::Screen};
+use crate::{config::Config, human::HumanPose, menu::Screen};
 
 const EXPOSURE: f32 = 13.5;
 const STEP: f32 = 0.25;
@@ -56,7 +61,8 @@ impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(Screen::InGame), (spawn_camera, draw_menus_over_game))
             .add_systems(OnExit(Screen::InGame), restore_menu_camera)
-            .add_systems(Update, (capture_cursor, fly_spectator.run_if(in_state(GameMenu::Closed)).run_if(|fp: Res<FirstPerson>| !fp.active)));
+            .add_systems(Update, capture_cursor)
+            .add_systems(Update, fly_spectator.in_set(Smoothing::View).run_if(in_state(GameMenu::Closed)).run_if(|fp: Res<FirstPerson>| !fp.active));
     }
 }
 
@@ -130,16 +136,26 @@ fn fly_spectator(
     time: Res<Time>,
     config: Res<Config>,
     (fly, look, zoom, fast, slow): (Single<&Action<Fly>>, Single<&Action<FlyLook>>, Single<&Action<FlyZoom>>, Single<&Action<FlyFast>>, Single<&Action<FlySlow>>),
+    net: Option<Res<NetGame>>,
+    humans: Query<(&NetHuman, &Transform, &HumanPose), Without<Spectator>>,
     camera: Single<(&mut Transform, &mut Spectator)>,
 ) {
     let (mut transform, mut spectator) = camera.into_inner();
     let frames = time.delta_secs() * GAME_FPS;
+    let target = net.filter(|n| spectates(n.sync.game_type) || n.sync.game_type == GameMode::World).and_then(|n| usize::try_from(n.spectating).ok());
+    let watched = target.and_then(|t| humans.iter().find(|(nh, ..)| nh.0 == t)).map(|(_, at, pose)| bone_at(at.translation, pose, BoneId::Head.index()).0);
+
+    if let Some(head) = watched {
+        spectator.pos = head;
+    }
 
     let speed = STEP * if ***fast { FAST } else { 1.0 } * if ***slow { SLOW } else { 1.0 };
     let (across, up, back) = (fly.x, fly.y, fly.z);
     let (sin, cos) = spectator.yaw.sin_cos();
 
-    spectator.pos += Vec3::new(-back * sin + across * cos, up, across * sin + back * cos) * speed * frames;
+    if watched.is_none() {
+        spectator.pos += Vec3::new(-back * sin + across * cos, up, across * sin + back * cos) * speed * frames;
+    }
 
     let invert = if config.invert_mouse != 0 { -1.0 } else { 1.0 };
 

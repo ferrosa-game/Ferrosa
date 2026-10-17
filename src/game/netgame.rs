@@ -318,7 +318,7 @@ pub struct ChatLine {
 
 #[derive(Message, Clone, Debug)]
 pub enum NetEvent {
-    Gunshot { kind: Option<ItemKind>, pos: Vec3, vel: Vec3 },
+    Gunshot { kind: Option<ItemKind>, bullet: i32, pos: Vec3, vel: Vec3 },
     BulletHit { hit: i32, pos: Vec3, normal: Vec3 },
     BulletHole { pos: Vec3, glass: bool },
     Explosion { pos: Vec3 },
@@ -784,7 +784,7 @@ impl NetGame {
 
     fn happening(&self, kind: &ServerEvent) -> Option<NetEvent> {
         Some(match kind {
-            ServerEvent::Bullet(e) => NetEvent::Gunshot { kind: self.items.get(e.item_id as usize).and_then(|i| i.kind), pos: e.pos, vel: e.vel },
+            ServerEvent::Bullet(e) => NetEvent::Gunshot { kind: self.items.get(e.item_id as usize).and_then(|i| i.kind), bullet: e.bullet_type, pos: e.pos, vel: e.vel },
             ServerEvent::BulletHit(e) => NetEvent::BulletHit { hit: e.hit_type, pos: e.pos, normal: e.normal },
             ServerEvent::BulletHole(e) => NetEvent::BulletHole { pos: e.pos, glass: e.face != -1 },
             ServerEvent::Explosion(e) => NetEvent::Explosion { pos: e.pos },
