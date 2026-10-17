@@ -191,7 +191,7 @@ fn record(
     }
 }
 
-fn line_of_sight(level: &Level, from: Vec3, to: Vec3) -> f32 {
+pub fn line_of_sight(level: &Level, from: Vec3, to: Vec3) -> f32 {
     let map = &level.map;
     let clear = from.distance(to) <= SIGHT_RANGE && line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, from, to).is_none();
 

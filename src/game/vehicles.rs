@@ -46,8 +46,8 @@ impl VehicleTypes {
 }
 
 #[derive(Component)]
-struct NetVehicle {
-    index: usize,
+pub struct NetVehicle {
+    pub index: usize,
     kind: VehicleKind,
 }
 

@@ -100,7 +100,7 @@ impl Plugin for SoundsPlugin {
     }
 }
 
-fn decode(path: &Path) -> Option<SamplesBuffer> {
+pub fn decode(path: &Path) -> Option<SamplesBuffer> {
     let bytes = std::fs::read(path).inspect_err(|e| warn!("{}: {e}", path.display())).ok()?;
     let decoder = Decoder::new(Cursor::new(bytes)).inspect_err(|e| warn!("{}: {e}", path.display())).ok()?;
     let (channels, rate) = (decoder.channels(), decoder.sample_rate());
