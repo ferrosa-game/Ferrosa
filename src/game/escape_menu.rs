@@ -10,6 +10,9 @@ use crate::{
 };
 
 const BUTTON: Vec2 = Vec2::new(240.0, 32.0);
+pub const PLAYER_MENU_LAYER: i32 = 2;
+pub const ROSTER_LAYER: i32 = 3;
+const MENU_LAYER: i32 = 4;
 const BACK_BUTTON: Vec2 = Vec2::new(320.0, 44.0);
 const SHADE: Color = Color::srgba(0.0, 0.0, 0.0, 0.5);
 const OPTIONS_SHADE: Color = Color::srgba(0.035, 0.063, 0.082, 0.9);
@@ -71,6 +74,7 @@ fn spawn_menu(mut commands: Commands) {
                 ..default()
             },
             BackgroundColor(SHADE),
+            GlobalZIndex(MENU_LAYER),
             DespawnOnExit(GameMenu::Open),
         ))
         .id();
@@ -83,7 +87,7 @@ fn spawn_menu(mut commands: Commands) {
 fn spawn_options_page(mut commands: Commands, config: Res<Config>, devices: Res<AudioDevices>) {
     let page = spawn_options(&mut commands, &config, &devices);
 
-    commands.entity(page).insert((BackgroundColor(OPTIONS_SHADE), DespawnOnExit(GameMenu::Options)));
+    commands.entity(page).insert((BackgroundColor(OPTIONS_SHADE), GlobalZIndex(MENU_LAYER), DespawnOnExit(GameMenu::Options)));
     commands.spawn((Node { height: px(24.0), ..default() }, ChildOf(page)));
 
     menu_button(&mut commands, page, "Back", MenuButton::Back, KeyCode::Escape, BACK_BUTTON);

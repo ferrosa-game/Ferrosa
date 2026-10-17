@@ -16,6 +16,9 @@ use super::{
 use crate::{fonts::GameFonts, menu::Screen};
 
 const DRIVING: u32 = 2;
+const PAIN_PER_SHADE: f32 = 64.0;
+const DARKEST: f32 = 0.75;
+const DAMAGE_LAYER: i32 = 1;
 const FLYING: u32 = 3;
 const GEARS: [&str; 3] = ["Run", "Walk", "Aim"];
 const PHONE_LINES: [&str; 3] = ["1111 - Goldmen", "2222 - Monsota", "3333 - OXS"];
@@ -52,6 +55,9 @@ pub enum Stick {
     BottomLeft,
     TopLeft,
 }
+
+#[derive(Component)]
+struct DamageFade;
 
 #[derive(Component)]
 struct ProgressBar;
@@ -113,7 +119,7 @@ impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(Screen::InGame), spawn_hud).add_systems(
             Update,
-            (show_hud, (show_status, show_menu_line, show_phone_help, show_crosshair, show_aim, show_gauges).run_if(resource_exists::<NetGame>)).chain().run_if(in_state(Screen::InGame)),
+            (show_hud, (show_status, show_menu_line, show_phone_help, show_crosshair, show_aim, show_gauges, fade_for_damage).run_if(resource_exists::<NetGame>)).chain().run_if(in_state(Screen::InGame)),
         );
     }
 }
@@ -230,6 +236,18 @@ fn spawn_hud(mut commands: Commands, fonts: Res<GameFonts>) {
     }
 
     spawn_gauges(&mut commands, bottom, &fonts.rockwell);
+
+    let full = Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), ..default() };
+    commands.spawn((full, DamageFade, BackgroundColor(Color::NONE), GlobalZIndex(DAMAGE_LAYER), Pickable::IGNORE, DespawnOnExit(Screen::InGame)));
+}
+
+fn fade_for_damage(net: Res<NetGame>, mut fade: Single<&mut BackgroundColor, With<DamageFade>>) {
+    let dark = own(&net).map_or(0.0, |(_, _, own)| (own.pain.max(0) as f32 / PAIN_PER_SHADE).min(DARKEST));
+    let colour = Color::BLACK.with_alpha(dark);
+
+    if fade.0 != colour {
+        fade.0 = colour;
+    }
 }
 
 fn spawn_gauges(commands: &mut Commands, screen: Entity, font: &Handle<Font>) {

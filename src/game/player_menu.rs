@@ -4,7 +4,7 @@ use ferrosa_protocol::{
     clientbound::game::{ItemKind, MenuButton, MenuType},
 };
 
-use super::{GAME_SCREEN, escape_menu::GameMenu, items::ItemTypes, netgame::NetGame};
+use super::{GAME_SCREEN, escape_menu::{GameMenu, PLAYER_MENU_LAYER}, items::ItemTypes, netgame::NetGame};
 use crate::{
     menu::MENU_BACKGROUND,
     ui::{self, Shortcut},
@@ -108,7 +108,7 @@ fn build_player_menu(mut commands: Commands, net: Res<NetGame>, items: Option<Re
 
     let background = if view.menu == MenuType::Lobby { MENU_BACKGROUND } else { Color::NONE };
     let panel = commands
-        .spawn((Node { width: percent(100), height: percent(100), ..default() }, BackgroundColor(background), PlayerMenuPanel, DespawnOnExit(GameMenu::PlayerMenu)))
+        .spawn((Node { width: percent(100), height: percent(100), ..default() }, BackgroundColor(background), GlobalZIndex(PLAYER_MENU_LAYER), PlayerMenuPanel, DespawnOnExit(GameMenu::PlayerMenu)))
         .id();
     let price = |kind: ItemKind| items.as_ref().and_then(|t| t.0.get(kind as usize)).map_or(0, |t| t.price);
 

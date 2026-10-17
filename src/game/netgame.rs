@@ -31,6 +31,9 @@ const EVENTS: usize = 0x10000;
 const ACTIONS: usize = 0x40;
 const ACTIONS_SENT: i32 = 0xf;
 const VOICE_FRAMES: usize = 0x40;
+const VOICE_SENT: usize = 6;
+const VOICE_RECEIVED: usize = 4;
+pub const VOICE_CHANNELS: usize = 8;
 pub const INVENTORY_SLOTS: usize = 7;
 const MAX_ITEM_CHILDREN: usize = 8;
 const BONES: usize = 0xf;
@@ -289,6 +292,22 @@ pub struct TrafficCar {
 }
 
 #[derive(Clone, Debug)]
+pub struct VoiceChannel {
+    pub active: bool,
+    pub player: i32,
+    pub human: i32,
+    pub item: i32,
+    pub frames: Vec<VoiceFrame>,
+    pub next: usize,
+}
+
+impl Default for VoiceChannel {
+    fn default() -> Self {
+        Self { active: false, player: -1, human: -1, item: -1, frames: vec![VoiceFrame::default(); VOICE_FRAMES], next: 0 }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct ChatLine {
     pub kind: ChatType,
     pub speaker: i32,
@@ -345,7 +364,10 @@ pub struct NetGame {
     sent: u32,
     pub ping: u32,
     pub spectating: i32,
-    voice_out: Vec<VoiceFrame>,
+    pub voice_out: Vec<VoiceFrame>,
+    pub voice_out_next: usize,
+    pub silenced: bool,
+    pub voice: Vec<VoiceChannel>,
 }
 
 impl NetGame {
@@ -392,6 +414,9 @@ impl NetGame {
             ping: 0,
             spectating: -1,
             voice_out: vec![VoiceFrame::default(); VOICE_FRAMES],
+            voice_out_next: 0,
+            silenced: true,
+            voice: vec![VoiceChannel::default(); VOICE_CHANNELS],
         }
     }
 
@@ -424,7 +449,6 @@ impl NetGame {
         p.menu_buttons.clear();
     }
 
-    // TODO: the microphone's frames; we send silence.
     pub fn send(&mut self, socket: &mut ClientSocket, camera: Vec3, now: u32) {
         let Some(pl) = self.me() else { return };
 
@@ -445,9 +469,9 @@ impl NetGame {
             })
             .collect();
 
-        let frames = std::array::from_fn(|k| VoiceFrame {
-            index: (VOICE_FRAMES - 6 + k) as u8,
-            ..self.voice_out[VOICE_FRAMES - 6 + k].clone()
+        let frames = std::array::from_fn(|k| {
+            let f = (self.voice_out_next + VOICE_FRAMES - VOICE_SENT + k) % VOICE_FRAMES;
+            VoiceFrame { index: f as u8, ..self.voice_out[f].clone() }
         });
 
         let p = ClientGamePacket {
@@ -474,7 +498,7 @@ impl NetGame {
             actions,
             voice_data: VoiceData {
                 frames,
-                is_silenced: true,
+                is_silenced: self.silenced,
             },
             spectating_human_id: self.spectating as u8,
             pack_ack: self.decoder.packs_applied,
@@ -584,6 +608,22 @@ impl NetGame {
         my_human.menu_buttons = p.menu_buttons.clone();
 
         self.objects(&p);
+
+        for (channel, sent) in self.voice.iter_mut().zip(&p.voice) {
+            let Some(sent) = sent else {
+                channel.active = false;
+                channel.frames.iter_mut().for_each(|f| f.size = 0);
+                continue;
+            };
+
+            (channel.active, channel.player, channel.human, channel.item) = (true, sent.player_id, sent.human_id, sent.item_id);
+
+            for f in &sent.voice_frames {
+                channel.frames[f.index as usize % VOICE_FRAMES] = f.clone();
+            }
+
+            channel.next = (sent.voice_frames[VOICE_RECEIVED - 1].index as usize + 1) % VOICE_FRAMES;
+        }
         self.server_events = p.global_event_count;
 
         for (id, e) in p.events {

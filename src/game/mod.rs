@@ -22,6 +22,7 @@ mod sounds;
 mod terrain;
 mod textures;
 mod vehicles;
+mod voice;
 
 use bevy::prelude::*;
 use ferrosa_world::map::Map;
@@ -55,7 +56,7 @@ impl Plugin for GamePlugin {
             vehicles::VehiclesPlugin,
             items::ItemsPlugin,
             smoothing::SmoothingPlugin,
-            (hud::HudPlugin, inventory::InventoryPlugin, paper_doll::PaperDollPlugin, doors::DoorsPlugin, sounds::SoundsPlugin, chat::ChatPlugin),
+            (hud::HudPlugin, inventory::InventoryPlugin, paper_doll::PaperDollPlugin, doors::DoorsPlugin, sounds::SoundsPlugin, chat::ChatPlugin, voice::VoicePlugin),
         ))
         .add_systems(Update, scale_ui.run_if(in_state(Screen::InGame)))
         .add_systems(OnExit(Screen::InGame), |mut scale: ResMut<UiScale>| scale.0 = 1.0);
