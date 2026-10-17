@@ -1,3 +1,4 @@
+mod audio;
 mod config;
 mod fonts;
 mod game;
@@ -21,7 +22,7 @@ fn main() {
                 .set(AssetPlugin { file_path: "data".into(), ..default() }),
         )
         .insert_resource(ClearColor(menu::MENU_BACKGROUND))
-        .add_plugins((config::ConfigPlugin, fonts::FontsPlugin))
+        .add_plugins((config::ConfigPlugin, fonts::FontsPlugin, audio::DevicesPlugin))
         .add_plugins((
             masterserver::MasterServerPlugin,
             ui::UiPlugin,

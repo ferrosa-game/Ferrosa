@@ -2,11 +2,9 @@ use bevy::{prelude::*, ui_widgets::Activate};
 
 use super::netgame::NetGame;
 use crate::{
+    audio::AudioDevices,
     config::Config,
-    menu::{
-        Screen,
-        options::{AudioDevices, spawn_options},
-    },
+    menu::{Screen, options::spawn_options},
     net::ClientSocket,
     ui::{self, Shortcut},
 };

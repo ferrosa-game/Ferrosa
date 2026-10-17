@@ -5,9 +5,8 @@ use bevy::{
     ui_widgets::{Activate, ValueChange},
     window::{MonitorSelection, PresentMode, PrimaryWindow, WindowMode},
 };
-use cpal::traits::{DeviceTrait, HostTrait};
-
 use crate::{
+    audio::AudioDevices,
     config::{Config, config_path},
     menu::{Screen, back_button, text},
     ui::{self, Shortcut},
@@ -21,14 +20,6 @@ type Flag = fn(&mut Config) -> &mut i32;
 
 #[derive(Component)]
 pub struct OptionsPage;
-
-#[derive(Resource)]
-pub struct AudioDevices {
-    output: Vec<String>,
-    input: Vec<String>,
-    chosen_output: usize,
-    chosen_input: usize,
-}
 
 #[derive(Resource, Default)]
 struct VoiceBinding {
@@ -47,7 +38,7 @@ pub(super) struct OptionsPlugin;
 impl Plugin for OptionsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<VoiceBinding>()
-            .add_systems(Startup, (apply_window_settings, list_audio_devices))
+            .add_systems(Startup, apply_window_settings)
             .add_systems(OnEnter(Screen::Options), options_screen)
             .add_systems(Update, (bind_voice_key, show_voice_settings).run_if(any_with_component::<OptionsPage>))
             .add_observer(|_: On<Remove<OptionsPage>>, mut binding: ResMut<VoiceBinding>| binding.waiting = false);
@@ -67,25 +58,6 @@ fn window_mode(fullscreen: bool) -> WindowMode {
 
 fn present_mode(sync: bool) -> PresentMode {
     if sync { PresentMode::AutoVsync } else { PresentMode::AutoNoVsync }
-}
-
-fn list_audio_devices(mut commands: Commands) {
-    let host = cpal::default_host();
-
-    let names = |devices: Option<Vec<cpal::Device>>| -> Vec<String> {
-        devices.iter().flatten().filter_map(|d| d.description().ok()).map(|d| device_name(&d)).collect()
-    };
-
-    commands.insert_resource(AudioDevices {
-        output: names(host.output_devices().ok().map(Iterator::collect)),
-        input: names(host.input_devices().ok().map(Iterator::collect)),
-        chosen_output: 0,
-        chosen_input: 0,
-    });
-}
-
-fn device_name(d: &cpal::DeviceDescription) -> String {
-    d.extended().first().map_or_else(|| d.name().to_string(), Clone::clone)
 }
 
 fn save(config: &Config) {
@@ -190,7 +162,6 @@ pub fn spawn_options(commands: &mut Commands, config: &Config, devices: &AudioDe
         }
     });
 
-    // TODO: the chosen devices opened for sound and voice once the client plays them.
     let list = Vec2::new(ITEM.x, 256.0);
     let output = ui::spinner::spinner(&mut commands, right, "Audio Output", &devices.output, devices.chosen_output, ITEM, list);
     commands.entity(output).observe(|v: On<ValueChange<usize>>, mut devices: ResMut<AudioDevices>| devices.chosen_output = v.value);
@@ -288,7 +259,7 @@ fn show_voice_settings(
     }
 }
 
-fn mouse_button_bit(button: MouseButton) -> Option<u32> {
+pub fn mouse_button_bit(button: MouseButton) -> Option<u32> {
     match button {
         MouseButton::Left => Some(0),
         MouseButton::Middle => Some(1),
@@ -322,7 +293,7 @@ fn copy_system_info(_: On<Activate>, adapter: Option<Res<RenderAdapterInfo>>, mu
     }
 }
 
-fn scancode(key: KeyCode) -> Option<i32> {
+pub fn scancode(key: KeyCode) -> Option<i32> {
     const LETTERS: [KeyCode; 26] = [
         KeyCode::KeyA, KeyCode::KeyB, KeyCode::KeyC, KeyCode::KeyD, KeyCode::KeyE, KeyCode::KeyF, KeyCode::KeyG, KeyCode::KeyH, KeyCode::KeyI,
         KeyCode::KeyJ, KeyCode::KeyK, KeyCode::KeyL, KeyCode::KeyM, KeyCode::KeyN, KeyCode::KeyO, KeyCode::KeyP, KeyCode::KeyQ, KeyCode::KeyR,

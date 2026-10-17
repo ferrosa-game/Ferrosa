@@ -1,14 +1,16 @@
-use std::f64::consts::PI;
+use std::{f64::consts::PI, io::Cursor, num::NonZero, path::Path};
 
-use bevy::{
-    audio::{AudioSource, SpatialScale, Volume},
-    platform::collections::HashMap,
-    prelude::*,
+use bevy::{platform::collections::HashMap, prelude::*};
+use ferrosa_protocol::clientbound::game::{GameState, ItemKind, events::sound::Sound};
+use rodio::{Decoder, Source, SpatialPlayer, buffer::SamplesBuffer, mixer::Mixer};
+
+use super::{
+    GAME_FPS,
+    camera::GameCamera,
+    netgame::{NetEvent, NetGame},
+    smoothing::Smoothing,
 };
-use ferrosa_protocol::clientbound::game::{ItemKind, events::sound::Sound};
-
-use super::{camera::GameCamera, netgame::NetEvent};
-use crate::{config::Config, menu::Screen};
+use crate::{audio::Speakers, config::Config, menu::Screen};
 
 const EAR_GAP: f32 = 0.2;
 const RATE: u32 = 48000;
@@ -29,7 +31,7 @@ const FADE: usize = 0x20;
 
 #[derive(Clone)]
 struct Clip {
-    source: Handle<AudioSource>,
+    buffer: SamplesBuffer,
     radius: f32,
 }
 
@@ -44,19 +46,75 @@ struct GameSounds {
     server: HashMap<u8, Clip>,
 }
 
+#[derive(Resource, Clone, Copy, Default)]
+pub struct Ears {
+    pub left: Vec3,
+    pub right: Vec3,
+    pub volume: f32,
+}
+
+pub struct Emitter {
+    player: SpatialPlayer,
+    at: Vec3,
+    scale: f32,
+}
+
+impl Emitter {
+    pub fn new(mixer: &Mixer, at: Vec3, radius: f32, ears: &Ears) -> Self {
+        let scale = radius.sqrt().recip();
+        let player = SpatialPlayer::connect_new(mixer, (at * scale).into(), (ears.left * scale).into(), (ears.right * scale).into());
+
+        Self { player, at, scale }
+    }
+
+    pub fn player(&self) -> &SpatialPlayer {
+        &self.player
+    }
+
+    pub fn place(&mut self, at: Vec3, radius: f32, ears: &Ears) {
+        (self.at, self.scale) = (at, radius.sqrt().recip());
+        self.hear(ears);
+    }
+
+    fn hear(&self, ears: &Ears) {
+        self.player.set_emitter_position((self.at * self.scale).into());
+        self.player.set_left_ear_position((ears.left * self.scale).into());
+        self.player.set_right_ear_position((ears.right * self.scale).into());
+    }
+}
+
+#[derive(Resource, Default)]
+struct Playing(Vec<(Emitter, f32)>);
+
 pub struct SoundsPlugin;
 
 impl Plugin for SoundsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, load_sounds)
-            .add_systems(Update, (listen, play_sounds).run_if(in_state(Screen::InGame)));
+        app.init_resource::<Ears>()
+            .init_resource::<Playing>()
+            .add_systems(Startup, load_sounds)
+            .add_systems(Update, (hear, play_sounds, keep_playing).chain().after(Smoothing::View).run_if(in_state(Screen::InGame)))
+            .add_systems(OnExit(Screen::InGame), |mut playing: ResMut<Playing>| playing.0.clear());
     }
 }
 
-fn load_sounds(mut commands: Commands, assets: Res<AssetServer>, mut sources: ResMut<Assets<AudioSource>>) {
-    let file = |name: &str, radius: f32| Clip { source: assets.load(format!("sound/{name}.wav")), radius };
+fn decode(path: &Path) -> Option<SamplesBuffer> {
+    let bytes = std::fs::read(path).inspect_err(|e| warn!("{}: {e}", path.display())).ok()?;
+    let decoder = Decoder::new(Cursor::new(bytes)).inspect_err(|e| warn!("{}: {e}", path.display())).ok()?;
+    let (channels, rate) = (decoder.channels(), decoder.sample_rate());
+
+    Some(SamplesBuffer::new(channels, rate, decoder.collect::<Vec<_>>()))
+}
+
+fn tone_buffer(samples: Vec<f32>) -> SamplesBuffer {
+    SamplesBuffer::new(NonZero::<u16>::MIN, NonZero::new(RATE).expect("a rate"), samples)
+}
+
+fn load_sounds(mut commands: Commands) {
+    let silence = || tone_buffer(vec![0.0]);
+    let file = |name: &str, radius: f32| Clip { buffer: decode(&Path::new("data/sound").join(format!("{name}.wav"))).unwrap_or_else(silence), radius };
     let numbered = |stem: &str, count: usize, radius: f32| (1..=count).map(|k| file(&format!("{stem}{k:02}"), radius)).collect::<Vec<_>>();
-    let mut tone = |key: usize| Clip { source: sources.add(AudioSource { bytes: wav(&dial_tone(key)).into() }), radius: KEYS };
+    let tone = |key: usize| Clip { buffer: tone_buffer(dial_tone(key)), radius: KEYS };
 
     let mut server: HashMap<u8, Clip> = [
         (Sound::CarCrash, file("carcrash02", FAR)),
@@ -88,7 +146,7 @@ fn load_sounds(mut commands: Commands, assets: Res<AssetServer>, mut sources: Re
     });
 }
 
-fn dial_tone(key: usize) -> Vec<i16> {
+fn dial_tone(key: usize) -> Vec<f32> {
     let (high, low, length) = match key {
         1 => (1209.0, 697.0, KEY_LENGTH),
         2 => (1336.0, 697.0, KEY_LENGTH),
@@ -108,45 +166,26 @@ fn dial_tone(key: usize) -> Vec<i16> {
         .map(|i| {
             let fade = 0.9f64.powi(i.saturating_sub(length - FADE) as i32);
             let t = i as f64;
-            (((step(high) * t).sin() + (step(low) * t).sin()) * fade * 8192.0) as i16
+            (((step(high) * t).sin() + (step(low) * t).sin()) * fade * 0.25) as f32
         })
         .collect()
 }
 
-fn wav(samples: &[i16]) -> Vec<u8> {
-    let data = (samples.len() * 2) as u32;
-    let header = [
-        &b"RIFF"[..],
-        &(36 + data).to_le_bytes(),
-        b"WAVEfmt ",
-        &16u32.to_le_bytes(),
-        &1u16.to_le_bytes(),
-        &1u16.to_le_bytes(),
-        &RATE.to_le_bytes(),
-        &(RATE * 2).to_le_bytes(),
-        &2u16.to_le_bytes(),
-        &16u16.to_le_bytes(),
-        b"data",
-        &data.to_le_bytes(),
-    ]
-    .concat();
+fn hear(camera: Option<Single<&Transform, With<GameCamera>>>, config: Res<Config>, net: Option<Res<NetGame>>, mut ears: ResMut<Ears>) {
+    let Some(camera) = camera else { return };
+    let side = camera.right() * EAR_GAP * 0.5;
+    let ending = net.filter(|n| n.game_state == GameState::InGame).map_or(1.0, |n| (n.timer as f32 / GAME_FPS).clamp(0.0, 1.0));
+    let volume = if config.sound != 0 { config.sound_volume as f32 / 100.0 * ending } else { 0.0 };
 
-    header.into_iter().chain(samples.iter().flat_map(|s| s.to_le_bytes())).collect()
-}
-
-fn listen(mut commands: Commands, cameras: Query<Entity, (With<GameCamera>, Without<SpatialListener>)>) {
-    for camera in &cameras {
-        commands.entity(camera).insert(SpatialListener::new(EAR_GAP));
-    }
+    *ears = Ears { left: camera.translation - side, right: camera.translation + side, volume: volume * volume };
 }
 
 fn pick(clips: &[Clip]) -> Option<&Clip> {
     clips.get(rand::random_range(0..clips.len().max(1)))
 }
 
-fn play_sounds(mut commands: Commands, mut happenings: MessageReader<NetEvent>, sounds: Option<Res<GameSounds>>, config: Res<Config>) {
-    let Some(sounds) = sounds else { return };
-    let master = if config.sound != 0 { config.sound_volume as f32 / 100.0 } else { 0.0 };
+fn play_sounds(mut happenings: MessageReader<NetEvent>, sounds: Option<Res<GameSounds>>, speakers: Res<Speakers>, ears: Res<Ears>, mut playing: ResMut<Playing>) {
+    let (Some(sounds), Some(mixer)) = (sounds, speakers.0.as_ref()) else { return };
 
     for happening in happenings.read() {
         let (clip, pos, volume, pitch) = match *happening {
@@ -167,12 +206,19 @@ fn play_sounds(mut commands: Commands, mut happenings: MessageReader<NetEvent>, 
         };
 
         let Some(clip) = clip else { continue };
-        let settings = PlaybackSettings::DESPAWN
-            .with_spatial(true)
-            .with_spatial_scale(SpatialScale::new(clip.radius.sqrt().recip()))
-            .with_volume(Volume::Linear(volume * master))
-            .with_speed(pitch);
+        let emitter = Emitter::new(mixer, pos, clip.radius, &ears);
 
-        commands.spawn((AudioPlayer(clip.source.clone()), settings, Transform::from_translation(pos), DespawnOnExit(Screen::InGame)));
+        emitter.player().set_volume(volume.min(1.0) * ears.volume);
+        emitter.player().set_speed(pitch);
+        emitter.player().append(clip.buffer.clone());
+        playing.0.push((emitter, volume.min(1.0)));
     }
+}
+
+fn keep_playing(ears: Res<Ears>, mut playing: ResMut<Playing>) {
+    playing.0.retain(|(emitter, volume)| {
+        emitter.hear(&ears);
+        emitter.player().set_volume(volume * ears.volume);
+        !emitter.player().empty()
+    });
 }
