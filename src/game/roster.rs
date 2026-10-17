@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
     fonts::GameFonts,
-    menu::Screen,
+    menu::{MENU_BACKGROUND, Screen},
     ui::{self, Shortcut},
 };
 
@@ -39,6 +39,7 @@ struct View {
     day: Option<String>,
     winner: Option<(String, [f32; 3])>,
     columns: Vec<Vec<Item>>,
+    backed: bool,
 }
 
 #[derive(Component)]
@@ -141,7 +142,7 @@ fn roster(net: &NetGame) -> View {
         })
         .collect();
 
-    View { day, winner, columns }
+    View { day, winner, columns, backed: state == GameState::Restarting }
 }
 
 fn show_roster(
@@ -175,7 +176,8 @@ fn spawn_text(commands: &mut Commands, parent: Entity, s: &str, font: &Handle<Fo
 
 fn spawn_roster(commands: &mut Commands, view: &View, font: &Handle<Font>) {
     let full = Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), ..default() };
-    let panel = commands.spawn((full, Pickable::IGNORE, GlobalZIndex(ROSTER_LAYER), RosterPanel, DespawnOnExit(Screen::InGame))).id();
+    let background = BackgroundColor(if view.backed { MENU_BACKGROUND } else { Color::NONE });
+    let panel = commands.spawn((full, background, Pickable::IGNORE, GlobalZIndex(ROSTER_LAYER), RosterPanel, DespawnOnExit(Screen::InGame))).id();
 
     if let Some(day) = &view.day {
         spawn_text(commands, panel, day, font, 20.0, WATCHING, Node { position_type: PositionType::Absolute, left: px(8), top: px(16), ..default() });

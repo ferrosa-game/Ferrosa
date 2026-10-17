@@ -26,6 +26,12 @@ const DARK: Color = Color::srgb(0.06, 0.06, 0.06);
 const MISSING: Color = Color::srgb(1.0, 0.25, 0.5);
 const DARK_MATERIAL: usize = 2;
 
+#[derive(Component)]
+pub struct BlockPanes {
+    pub origin: IVec3,
+    pub centre: Vec3,
+}
+
 #[derive(Resource)]
 struct BlockMaterials {
     blocks: Vec<Handle<StandardMaterial>>,
@@ -64,14 +70,18 @@ fn mesh(positions: Vec<[f32; 3]>, normals: Vec<[f32; 3]>, uvs: Option<Vec<[f32; 
     m
 }
 
+pub fn centred_mesh(part: Part, origin: Vec3) -> Mesh {
+    let positions = part.positions.iter().map(|p| (Vec3::from_array(*p) - origin).to_array()).collect();
+
+    mesh(positions, part.normals, Some(part.uvs), part.indices)
+}
+
 fn part_mesh(meshes: &mut Assets<Mesh>, part: Part, origin: Vec3) -> Option<Mesh3d> {
     if part.indices.is_empty() {
         return None;
     }
 
-    let positions = part.positions.iter().map(|p| (Vec3::from_array(*p) - origin).to_array()).collect();
-
-    Some(Mesh3d(meshes.add(mesh(positions, part.normals, Some(part.uvs), part.indices))))
+    Some(Mesh3d(meshes.add(centred_mesh(part, origin))))
 }
 
 fn surface(base_color: Color, base_color_texture: Option<Handle<Image>>) -> StandardMaterial {
@@ -161,7 +171,8 @@ fn spawn_blocks(mut commands: Commands, mut geometry: ResMut<LevelGeometry>, mat
         }
 
         if let Some(m) = part_mesh(&mut meshes, block.panes, block.centre) {
-            commands.spawn((m, MeshMaterial3d(materials.glass.clone()), NotShadowCaster, near.clone(), at.clone()));
+            let panes = BlockPanes { origin: block.origin, centre: block.centre };
+            commands.spawn((m, panes, MeshMaterial3d(materials.glass.clone()), NotShadowCaster, near.clone(), at.clone()));
         }
     }
 }

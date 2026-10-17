@@ -1,4 +1,4 @@
-use bevy::math::Vec3;
+use bevy::math::{IVec3, Vec3};
 use ferrosa_world::{
     area::{CUBE, MESH, TYPE_MASK},
     map::Map,
@@ -42,6 +42,7 @@ fn decode_slot(w: u16, cube: bool) -> (usize, usize) {
 }
 
 pub struct Block {
+    pub origin: IVec3,
     pub centre: Vec3,
     pub facades: Vec<Part>,
     pub interior: Vec<Part>,
@@ -151,20 +152,47 @@ impl Builder<'_> {
         }
     }
 
-    fn pane(&mut self, corners: [Vec3; 4]) {
-        let n = (corners[1] - corners[0]).cross(corners[2] - corners[0]).normalize_or_zero();
-        let part = &mut self.block.panes;
-        let base = part.positions.len() as u32;
+}
 
-        for (k, p) in corners.into_iter().enumerate() {
-            part.positions.push(p.to_array());
-            part.normals.push(n.to_array());
+fn pane(part: &mut Part, corners: [Vec3; 4]) {
+    let n = (corners[1] - corners[0]).cross(corners[2] - corners[0]).normalize_or_zero();
+    let base = part.positions.len() as u32;
 
-            part.uvs.push([(k == 1 || k == 2) as u32 as f32, (k >= 2) as u32 as f32]);
+    for (k, p) in corners.into_iter().enumerate() {
+        part.positions.push(p.to_array());
+        part.normals.push(n.to_array());
+
+        part.uvs.push([(k == 1 || k == 2) as u32 as f32, (k >= 2) as u32 as f32]);
+    }
+
+    part.indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
+}
+
+pub fn panes(map: &Map, origin: IVec3) -> Part {
+    let area = &map.level.area;
+    let bs = area.block_size;
+    let chunk = origin.as_vec3() * bs;
+    let mut part = Part::default();
+    let Some(record) = area.record(origin.x, origin.y, origin.z) else { return part };
+
+    for cell in 0..512usize {
+        let v = record.layer1[cell];
+
+        if v & TYPE_MASK != MESH {
+            continue;
         }
 
-        part.indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
+        let Some(mesh) = map.level.meshes.get(v & 0xffff) else { continue };
+        let local = Vec3::new((cell & 7) as f32, (cell >> 6) as f32, ((cell >> 3) & 7) as f32) * bs;
+
+        for (w, wall) in mesh.walls.iter().enumerate() {
+            if ((v >> 16) & 0xff).checked_shr(w as u32).unwrap_or(0) & 1 == 0 {
+                pane(&mut part, [3, 2, 1, 0].map(|k| chunk + bs * wall[k] + local + area.origin));
+            }
+        }
     }
+
+    part
 }
 
 // TODO: the merging of coplanar quads, and dropping faces against connected neighbours.
@@ -173,13 +201,13 @@ pub fn build(map: &Map) -> Built {
     let bs = area.block_size;
     let count = BUILTIN + map.level.texture_data.len();
     let empty = |n: usize| (0..n).map(|_| Part::default()).collect::<Vec<_>>();
-    let new_block = |centre: Vec3| Block { centre, facades: empty(map.level.atlas.len()), interior: empty(count + MARKINGS), panes: Part::default() };
-    let mut b = Builder { parts: empty(count + MARKINGS), atlas: &map.level.atlas, marked: count, block: new_block(Vec3::ZERO), interior: false };
+    let new_block = |origin: IVec3, centre: Vec3| Block { origin, centre, facades: empty(map.level.atlas.len()), interior: empty(count + MARKINGS), panes: Part::default() };
+    let mut b = Builder { parts: empty(count + MARKINGS), atlas: &map.level.atlas, marked: count, block: new_block(IVec3::ZERO, Vec3::ZERO), interior: false };
     let mut blocks = Vec::new();
 
     for (origin, record) in area.blocks() {
         let chunk = origin.as_vec3() * bs;
-        b.block = new_block(chunk + Vec3::splat(bs * 4.0) + area.origin);
+        b.block = new_block(origin, chunk + Vec3::splat(bs * 4.0) + area.origin);
 
         for cell in 0..512usize {
             let local = Vec3::new((cell & 7) as f32, (cell >> 6) as f32, ((cell >> 3) & 7) as f32) * bs;
@@ -206,16 +234,12 @@ pub fn build(map: &Map) -> Built {
                 let word = |w: u16| if (w as i16) < 0 { (ATLAS, (w & 0x3ff) as usize) } else { ((w & 0xff) as usize, 0) };
                 let slot = |code: usize| if code > 7 { Some(word(*slots.get(code - 8)?)) } else { Some((bytes[code] as usize, 0)) };
                 b.mesh(mesh, chunk, local, area.origin, bs, ((v >> 24) & 3) as usize, &slot);
-
-                for (w, wall) in mesh.walls.iter().enumerate() {
-                    if ((v >> 16) & 0xff).checked_shr(w as u32).unwrap_or(0) & 1 == 0 {
-                        b.pane([3, 2, 1, 0].map(|k| chunk + bs * wall[k] + local + area.origin));
-                    }
-                }
             }
         }
 
-        let next = new_block(Vec3::ZERO);
+        b.block.panes = panes(map, origin);
+
+        let next = new_block(IVec3::ZERO, Vec3::ZERO);
 
         blocks.push(std::mem::replace(&mut b.block, next));
     }

@@ -4,6 +4,7 @@ mod camera;
 mod chat;
 mod controls;
 mod doors;
+mod effects;
 mod escape_menu;
 mod first_person;
 mod hud;
@@ -59,7 +60,7 @@ impl Plugin for GamePlugin {
             vehicles::VehiclesPlugin,
             items::ItemsPlugin,
             smoothing::SmoothingPlugin,
-            (hud::HudPlugin, inventory::InventoryPlugin, paper_doll::PaperDollPlugin, doors::DoorsPlugin, sounds::SoundsPlugin, chat::ChatPlugin, voice::VoicePlugin, spectating::SpectatingPlugin, bullets::BulletsPlugin, street_objects::StreetObjectsPlugin),
+            (hud::HudPlugin, inventory::InventoryPlugin, paper_doll::PaperDollPlugin, doors::DoorsPlugin, sounds::SoundsPlugin, chat::ChatPlugin, voice::VoicePlugin, spectating::SpectatingPlugin, bullets::BulletsPlugin, street_objects::StreetObjectsPlugin, effects::EffectsPlugin),
         ))
         .add_systems(Update, scale_ui.run_if(in_state(Screen::InGame)))
         .add_systems(OnExit(Screen::InGame), |mut scale: ResMut<UiScale>| scale.0 = 1.0);

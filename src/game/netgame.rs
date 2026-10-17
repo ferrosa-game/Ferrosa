@@ -318,11 +318,12 @@ pub struct ChatLine {
 
 #[derive(Message, Clone, Debug)]
 pub enum NetEvent {
-    Gunshot { kind: Option<ItemKind>, bullet: i32, pos: Vec3, vel: Vec3 },
+    Gunshot { kind: Option<ItemKind>, item: i32, bullet: i32, pos: Vec3, vel: Vec3 },
     BulletHit { hit: i32, pos: Vec3, normal: Vec3 },
-    BulletHole { pos: Vec3, glass: bool },
+    BulletHole { pos: Vec3, vel: Vec3, cell: IVec3, face: i32 },
     Explosion { pos: Vec3 },
-    WindowBroke { pos: Vec3 },
+    WindowBroke { vehicle: i32, window: i32, pos: Vec3, vel: Vec3 },
+    ShellHit { pos: Vec3, volume: f32, pitch: f32 },
     Sound { sound: Sound, pos: Vec3, volume: f32, pitch: f32 },
 }
 
@@ -784,11 +785,11 @@ impl NetGame {
 
     fn happening(&self, kind: &ServerEvent) -> Option<NetEvent> {
         Some(match kind {
-            ServerEvent::Bullet(e) => NetEvent::Gunshot { kind: self.items.get(e.item_id as usize).and_then(|i| i.kind), bullet: e.bullet_type, pos: e.pos, vel: e.vel },
+            ServerEvent::Bullet(e) => NetEvent::Gunshot { kind: self.items.get(e.item_id as usize).and_then(|i| i.kind), item: e.item_id, bullet: e.bullet_type, pos: e.pos, vel: e.vel },
             ServerEvent::BulletHit(e) => NetEvent::BulletHit { hit: e.hit_type, pos: e.pos, normal: e.normal },
-            ServerEvent::BulletHole(e) => NetEvent::BulletHole { pos: e.pos, glass: e.face != -1 },
+            ServerEvent::BulletHole(e) => NetEvent::BulletHole { pos: e.pos, vel: e.vel, cell: IVec3::new(e.block_x, e.block_y, e.block_z), face: e.face },
             ServerEvent::Explosion(e) => NetEvent::Explosion { pos: e.pos },
-            ServerEvent::UpdateVehicle(e) if e.kind == 0 => NetEvent::WindowBroke { pos: e.pos },
+            ServerEvent::UpdateVehicle(e) if e.kind == 0 => NetEvent::WindowBroke { vehicle: e.vehicle_id, window: e.part, pos: e.pos, vel: e.velocity },
             ServerEvent::Sound(e) => NetEvent::Sound { sound: e.sound_type, pos: e.pos, volume: e.volume, pitch: e.pitch },
             ServerEvent::PhoneSound(e) => {
                 let item = self.items.get(e.item_id as usize).filter(|i| i.active)?;

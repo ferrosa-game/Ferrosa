@@ -21,6 +21,7 @@ const NEAR: f32 = 1.0;
 const SHORT: f32 = 10.0;
 const FAR: f32 = 32.0;
 const KEYS: f32 = 0.25;
+const SHELL: f32 = 2.0;
 const RICOCHET: i32 = 0;
 const BODY: i32 = 1;
 const METAL: i32 = 2;
@@ -43,6 +44,7 @@ struct GameSounds {
     metal: Vec<Clip>,
     glass: Clip,
     explosion: Clip,
+    shell: Clip,
     server: HashMap<u8, Clip>,
 }
 
@@ -142,6 +144,7 @@ fn load_sounds(mut commands: Commands) {
         metal: numbered("bullethitmetal", 2, SHORT),
         glass: file("glassbreak01", SHORT),
         explosion: file("explosion01", FAR),
+        shell: file("shell_hit_cement", SHELL),
         server,
     });
 }
@@ -199,10 +202,11 @@ fn play_sounds(mut happenings: MessageReader<NetEvent>, sounds: Option<Res<GameS
                 };
                 (pick(clips), pos, 1.0, 1.0)
             }
-            NetEvent::BulletHole { pos, glass: true } | NetEvent::WindowBroke { pos } => (Some(&sounds.glass), pos, 1.0, rand::random_range(GLASS_PITCH.0..GLASS_PITCH.1)),
+            NetEvent::BulletHole { pos, face: 0.., .. } | NetEvent::WindowBroke { pos, .. } => (Some(&sounds.glass), pos, 1.0, rand::random_range(GLASS_PITCH.0..GLASS_PITCH.1)),
             NetEvent::Explosion { pos } => (Some(&sounds.explosion), pos, 1.0, 1.0),
             NetEvent::Sound { sound, pos, volume, pitch } => (sounds.server.get(&(sound as u8)), pos, volume, pitch),
-            NetEvent::BulletHole { glass: false, .. } => (None, Vec3::ZERO, 0.0, 1.0),
+            NetEvent::BulletHole { .. } => (None, Vec3::ZERO, 0.0, 1.0),
+            NetEvent::ShellHit { pos, volume, pitch } => (Some(&sounds.shell), pos, volume, pitch),
         };
 
         let Some(clip) = clip else { continue };
