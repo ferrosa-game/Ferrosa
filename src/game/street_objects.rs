@@ -22,6 +22,7 @@ const SIGN_MODEL: &str = "models/objects/object_4.glb";
 const LAMP: &str = "lamp";
 const SIGN_FACE: &str = "sign";
 const LIGHTS: [&str; 3] = ["light_red", "light_amber", "light_green"];
+const LAMP_GLOW: f32 = 0.2;
 const AMBER: i32 = 1;
 const GREEN: i32 = 2;
 const STREET_NAMES: [&str; 17] = [
@@ -138,7 +139,7 @@ fn sign_image(font: &FontRef, name: &str) -> Image {
 }
 
 fn spawn_street_objects(mut commands: Commands, assets: Res<AssetServer>, level: Res<Level>, mut images: ResMut<Assets<Image>>, mut materials: ResMut<Assets<StandardMaterial>>) {
-    let glow = Exposure { ev100: EXPOSURE }.exposure().recip();
+    let glow = Exposure { ev100: EXPOSURE }.exposure().recip() * LAMP_GLOW;
     let lights = LIGHTS.map(|name| {
         let texture = |suffix: &str| Some(assets.load(format!("models/objects/textures/{name}{suffix}.png")));
 
