@@ -4174,6 +4174,7 @@ dependencies = [
 name = "new_client"
 version = "0.1.0"
 dependencies = [
+ "ab_glyph",
  "bevy",
  "bevy_enhanced_input",
  "binrw",

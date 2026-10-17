@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 bevy = "0.20"
+ab_glyph = "0.2.32"
 bevy_enhanced_input = "0.27"
 steamworks = { version = "0.13.1", features = ["raw-bindings"] }
 rand = "0.10"

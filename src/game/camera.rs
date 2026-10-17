@@ -26,7 +26,7 @@ use super::{
 };
 use crate::{config::Config, human::HumanPose, menu::Screen};
 
-const EXPOSURE: f32 = 13.5;
+pub const EXPOSURE: f32 = 13.5;
 const STEP: f32 = 0.25;
 const FAST: f32 = 4.0;
 const SLOW: f32 = 0.25;
