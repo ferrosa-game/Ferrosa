@@ -42,7 +42,16 @@ const SWAPPING_HANDS: i32 = 1;
 const POCKETING: i32 = 2;
 
 #[derive(Resource)]
-struct ItemIcons(HashMap<ItemKind, Handle<Image>>);
+struct ItemIcons{
+    icons: HashMap<ItemKind, Handle<Image>>,
+    not_found: Handle<Image>
+}
+
+impl ItemIcons {
+    fn of(&self, kind: Option<ItemKind>) -> Option<Handle<Image>> {
+        kind.and_then(|k| self.icons.get(&k)).or(Some(&self.not_found)).cloned()
+    }
+}
 
 #[derive(Clone, PartialEq, Default)]
 struct View {
@@ -72,7 +81,10 @@ impl Plugin for InventoryPlugin {
 fn load_icons(mut commands: Commands, assets: Res<AssetServer>) {
     let icons = ICONS.iter().map(|&(kind, name)| (kind, assets.load(format!("icons/{name}.png")))).collect();
 
-    commands.insert_resource(ItemIcons(icons));
+    commands.insert_resource(ItemIcons {
+        icons,
+        not_found: assets.load("icons/icon-not-found.png")
+    });
 }
 
 fn slot_at(slot: usize) -> Vec2 {
@@ -134,7 +146,7 @@ fn spawn_slots(commands: &mut Commands, panel: Entity, view: &View, types: &Item
     };
 
     let icon = |kind: Option<ItemKind>, at: Vec2, scale: f32, tint: Color| {
-        let image = kind.and_then(|k| icons.0.get(&k)).cloned()?;
+        let image = icons.of(kind)?;
         Some((rect(align::BOTTOM_CENTRE, at, BOX * scale), ImageNode::new(image).with_color(tint), Pickable::IGNORE))
     };
 
@@ -201,7 +213,7 @@ fn fly_item(net: Res<NetGame>, icons: Res<ItemIcons>, flying: Single<(&mut Node,
         let to = to.min(INVENTORY_SLOTS - 1);
         let t = own.action_duration as f32 / 100.0;
 
-        Some((icons.0.get(&kind?)?.clone(), slot_at(from).lerp(slot_at(to), t)))
+        Some((icons.of(kind)?, slot_at(from).lerp(slot_at(to), t)))
     });
 
     let Some((icon, at)) = route else {
