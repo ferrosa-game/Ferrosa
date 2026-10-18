@@ -38,8 +38,6 @@ const ICONS: [(ItemKind, &str); 26] = [
     (ItemKind::Grenade, "icon-grenade"),
 ];
 const BOX: Vec2 = Vec2::new(128.0, 32.0);
-const HANDS: usize = 2;
-const POCKET_ITEMS: usize = 2;
 const SWAPPING_HANDS: i32 = 1;
 const POCKETING: i32 = 2;
 
@@ -108,7 +106,7 @@ fn show_inventory(
 ) {
     let view = own(&net).map(|(p, h, _)| {
         let dialling = in_hand(&net, h, 0).is_some_and(|(item, kind)| is_phone(kind) && net.items[item].phone.0 == DIALLING);
-        let selected = (HANDS..INVENTORY_SLOTS).find(|&slot| !dialling && input.holding(Control::Row((slot - 1) as u8)));
+        let selected = (2..INVENTORY_SLOTS).find(|&slot| !dialling && input.holding(Control::Row((slot - 1) as u8)));
 
         View { slots: p.display_inventory.iter().map(|s| s.iter().map(|&c| entry(c)).collect()).collect(), selected }
     });
@@ -140,7 +138,7 @@ fn spawn_slots(commands: &mut Commands, panel: Entity, view: &View, types: &Item
         Some((rect(align::BOTTOM_CENTRE, at, BOX * scale), ImageNode::new(image).with_color(tint), Pickable::IGNORE))
     };
 
-    for (slot, items) in view.slots.iter().enumerate().take(HANDS) {
+    for (slot, items) in view.slots.iter().enumerate().take(2) {
         let at = slot_at(slot);
 
         commands.spawn((frame(at + Vec2::X * 8.0, UiRect::all(px(1.0))), ChildOf(panel)));
@@ -164,10 +162,10 @@ fn spawn_slots(commands: &mut Commands, panel: Entity, view: &View, types: &Item
         }
     }
 
-    for (slot, items) in view.slots.iter().enumerate().skip(HANDS) {
+    for (slot, items) in view.slots.iter().enumerate().skip(2) {
         let at = slot_at(slot);
 
-        for row in 0..POCKET_ITEMS {
+        for row in 0..2 {
             let border = if row == 0 { UiRect { bottom: px(0.0), ..UiRect::all(px(1.0)) } } else { UiRect { top: px(0.0), ..UiRect::all(px(1.0)) } };
 
             commands.spawn((frame(at + Vec2::new(8.0, 32.0 * row as f32), border), ChildOf(panel)));
@@ -193,8 +191,8 @@ fn fly_item(net: Res<NetGame>, icons: Res<ItemIcons>, flying: Single<(&mut Node,
         let hand = own.action_hand as usize & 7;
 
         let (from, to) = match own.action_type {
-            POCKETING if p.display_inventory.get(hand).is_some_and(|s| !s.is_empty()) => (hand, own.action_slot as usize + HANDS),
-            POCKETING => (own.action_slot as usize + HANDS, hand),
+            POCKETING if p.display_inventory.get(hand).is_some_and(|s| !s.is_empty()) => (hand, own.action_slot as usize + 2),
+            POCKETING => (own.action_slot as usize + 2, hand),
             SWAPPING_HANDS => (hand, (own.action_hand ^ 1) as usize & 7),
             _ => return None,
         };

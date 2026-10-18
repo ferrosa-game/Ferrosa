@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy = "0.20"
+bevy = { version = "0.20", features = ["statically-linked-dxc"] }
 winit = "0.30.13"
 ab_glyph = "0.2.32"
 bevy_enhanced_input = "0.27"

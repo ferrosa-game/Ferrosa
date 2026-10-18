@@ -6,14 +6,20 @@ use std::{
 use bevy::{
     prelude::*,
     tasks::{AsyncComputeTaskPool, Task, futures::check_ready},
+    ui_widgets::Activate,
 };
 use ferrosa_world::{item_types::item_types, map::Map, vehicle_types::vehicle_types};
 
-use super::{Level, blocks, items::ItemTypes, terrain, vehicles::VehicleTypes};
-use crate::menu::{Screen, join::ServerSync};
+use super::{Level, blocks, items::ItemTypes, netgame::NetGame, terrain, vehicles::VehicleTypes};
+use crate::{
+    menu::{Screen, join::ServerSync},
+    net::ClientSocket,
+    ui::{self, Shortcut},
+};
 
 const DEFAULT_MAP: &str = "round";
 const DEFAULT_STREETS: (i32, i32, i32, i32) = (1024, 1024, 2600, 2600);
+const BACK: Vec2 = Vec2::new(320.0, 44.0);
 
 #[derive(Resource)]
 pub struct LevelGeometry {
@@ -30,7 +36,13 @@ struct Loaded {
 }
 
 #[derive(Resource)]
-struct Loading(Task<Result<Loaded, String>>);
+struct Loading {
+    map: String,
+    task: Task<Result<Loaded, String>>,
+}
+
+#[derive(Component)]
+struct LoadingScreen;
 
 #[derive(Component)]
 struct LoadingText;
@@ -92,16 +104,31 @@ fn start_loading(mut commands: Commands, sync: Option<Res<ServerSync>>) {
     let name = sync.map_or_else(|| DEFAULT_MAP.to_string(), |s| s.map.clone());
 
     commands.spawn((
-        Node { width: percent(100), height: percent(100), justify_content: JustifyContent::Center, align_items: AlignItems::Center, ..default() },
+        Node {
+            width: percent(100),
+            height: percent(100),
+            flex_direction: FlexDirection::Column,
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            row_gap: px(24),
+            ..default()
+        },
+        LoadingScreen,
         DespawnOnExit(Screen::Loading),
         children![(Text::new(format!("Loading {name}...")), LoadingText)],
     ));
 
-    commands.insert_resource(Loading(AsyncComputeTaskPool::get().spawn(async move { load(name) })));
+    commands.insert_resource(Loading { map: name.clone(), task: AsyncComputeTaskPool::get().spawn(async move { load(name) }) });
 }
 
-fn finish_loading(mut commands: Commands, mut loading: ResMut<Loading>, mut next: ResMut<NextState<Screen>>, mut text: Single<&mut Text, With<LoadingText>>) {
-    let Some(result) = check_ready(&mut loading.0) else { return };
+fn finish_loading(
+    mut commands: Commands,
+    mut loading: ResMut<Loading>,
+    mut next: ResMut<NextState<Screen>>,
+    mut text: Single<&mut Text, With<LoadingText>>,
+    screen: Single<Entity, With<LoadingScreen>>,
+) {
+    let Some(result) = check_ready(&mut loading.task) else { return };
 
     commands.remove_resource::<Loading>();
 
@@ -115,7 +142,19 @@ fn finish_loading(mut commands: Commands, mut loading: ResMut<Loading>, mut next
         }
         Err(e) => {
             error!("could not load the map: {e}");
-            text.0 = format!("Could not load the map: {e}");
+            text.0 = format!("Could not find the map {}!", loading.map);
+
+            let back = ui::button(&mut commands, *screen, "Back", BACK);
+            commands.entity(back).insert(Shortcut(KeyCode::Escape)).observe(leave);
         }
     }
+}
+
+fn leave(_: On<Activate>, mut commands: Commands, net: Option<Res<NetGame>>, mut socket: ResMut<ClientSocket>, mut next: ResMut<NextState<Screen>>) {
+    if let Some(net) = net {
+        net.leave(&mut socket);
+        commands.remove_resource::<NetGame>();
+    }
+
+    next.set(Screen::Main);
 }

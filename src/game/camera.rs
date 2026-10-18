@@ -1,13 +1,7 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
-    camera::{ClearColorConfig, Exposure, Hdr},
-    core_pipeline::tonemapping::Tonemapping,
-    light::AtmosphereEnvironmentMapLight,
-    pbr::AtmosphereSettings,
-    post_process::bloom::Bloom,
-    prelude::*,
-    window::{CursorGrabMode, CursorOptions},
+    camera::{ClearColorConfig, Exposure, Hdr}, core_pipeline::tonemapping::Tonemapping, light::AtmosphereEnvironmentMapLight, pbr::AtmosphereSettings, post_process::bloom::Bloom, prelude::*, render::view::NoIndirectDrawing, window::{CursorGrabMode, CursorOptions},
 };
 use ferrosa_world::{map::Map, skeleton::BoneId, track::Track};
 
@@ -89,6 +83,7 @@ fn spawn_camera(mut commands: Commands, level: Res<Level>) {
         GameCamera,
         Camera3d::default(),
         Camera { order: -1, ..default() },
+        NoIndirectDrawing, // This fixes a flashing issue on Dx12, why it exists? Idk.
         AtmosphereSettings::default(),
         AtmosphereEnvironmentMapLight::default(),
         Exposure { ev100: EXPOSURE },
