@@ -95,6 +95,9 @@ struct RoundTimer;
 struct MenuLine;
 
 #[derive(Component)]
+struct TabHint;
+
+#[derive(Component)]
 struct SharesLine;
 
 #[derive(Component)]
@@ -218,6 +221,7 @@ fn spawn_hud(mut commands: Commands, fonts: Res<GameFonts>) {
     let bottom = spawn_screen(&mut commands, HudScreen, Stick::Bottom);
     let bottom_left = spawn_screen(&mut commands, HudScreen, Stick::BottomLeft);
     let top_left = spawn_screen(&mut commands, HudScreen, Stick::TopLeft);
+    let top = spawn_screen(&mut commands, HudScreen, Stick::Top);
     let white = Color::WHITE;
 
     commands.spawn((rect(align::TOP_LEFT, Vec2::new(384.0, 288.0), Vec2::new(256.0, 32.0)), ProgressBar, BackgroundColor(colour([1.0, 1.0, 1.0, 0.125])), ChildOf(centre)));
@@ -232,6 +236,8 @@ fn spawn_hud(mut commands: Commands, fonts: Res<GameFonts>) {
 
     let (node, shift) = anchored(align::TOP_LEFT, Vec2::new(4.0, 4.0));
     commands.spawn((node, shift, MenuLine, text("", &fonts.rockwell, 24.0, white), ChildOf(top_left)));
+    let (node, shift) = anchored(align::CENTRE_X, Vec2::new(512.0, 4.0));
+    commands.spawn((node, shift, TabHint, text("Press Tab for Menu", &fonts.rockwell, 24.0, white), Visibility::Hidden, ChildOf(top)));
     let (node, shift) = anchored(align::TOP_LEFT, Vec2::new(192.0, 4.0));
     commands.spawn((node, shift, SharesLine, text("", &fonts.rockwell, 24.0, white), ChildOf(top_left)));
     let (node, shift) = anchored(align::TOP_LEFT, Vec2::new(512.0, 4.0));
@@ -409,6 +415,7 @@ fn show_menu_line(
         Query<(&mut Text, &mut Node, &mut Visibility), With<MenuLine>>,
         Query<(&mut Text, &mut Node, &mut Visibility), With<SharesLine>>,
         Query<(&mut Text, &mut Visibility), With<BudgetLine>>,
+        Query<&mut Visibility, With<TabHint>>,
     )>,
 ) {
     let Some((p, _, _)) = own(&net) else { return };
@@ -421,7 +428,7 @@ fn show_menu_line(
     let hint = has_menu && !open;
     let wealth = has_menu && open && !world;
 
-    let first = if hint { Some("Press Tab for Menu".to_string()) } else { wealth.then(|| format!("${}", p.money)) };
+    let first = wealth.then(|| format!("${}", p.money));
     let second = if corporation { Some(format!("${}", p.team_money)) } else { price.filter(|_| wealth).map(|price| format!("${}", (price / 10).wrapping_mul(p.stocks))) };
     let third = corporation.then(|| format!("Budget: ${}", p.budget));
 
@@ -437,6 +444,10 @@ fn show_menu_line(
 
     for (mut t, mut v) in &mut lines.p2() {
         set_text(&mut t, &mut v, third.clone());
+    }
+
+    for mut v in &mut lines.p3() {
+        shown(&mut v, hint);
     }
 }
 
