@@ -349,7 +349,6 @@ fn show_hud(net: Option<Res<NetGame>>, mut screens: Query<&mut Visibility, With<
     screens.iter_mut().for_each(|mut v| shown(&mut v, ours));
 }
 
-#[allow(clippy::type_complexity)]
 fn show_status(
     net: Res<NetGame>,
     mut bars: ParamSet<(
@@ -407,7 +406,6 @@ fn set_text(t: &mut Text, v: &mut Mut<Visibility>, s: Option<String>) {
     }
 }
 
-#[allow(clippy::type_complexity)]
 fn show_menu_line(
     net: Res<NetGame>,
     menu: Res<State<GameMenu>>,
@@ -548,7 +546,6 @@ fn show_aim(net: Res<NetGame>, input: Res<InputState>, mut lines: Query<(&AimLin
     }
 }
 
-#[allow(clippy::type_complexity)]
 fn show_gauges(
     net: Res<NetGame>,
     mut car: Query<&mut Visibility, (With<CarGauges>, Without<Collective>, Without<CollectiveLever>)>,

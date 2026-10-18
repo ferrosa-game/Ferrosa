@@ -97,7 +97,6 @@ fn spawn_inventory(mut commands: Commands) {
     commands.spawn((rect(align::BOTTOM_CENTRE, Vec2::ZERO, BOX), ImageNode::default(), Flying, Visibility::Hidden, Pickable::IGNORE, ChildOf(screen)));
 }
 
-#[allow(clippy::too_many_arguments)]
 fn show_inventory(
     mut commands: Commands,
     net: Res<NetGame>,

@@ -279,7 +279,6 @@ pub fn line_of_sight(level: &Level, from: Vec3, to: Vec3) -> f32 {
     if clear { 1.0 } else { BLOCKED }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn play_voices(
     mut net: ResMut<NetGame>,
     voices: Res<Voices>,

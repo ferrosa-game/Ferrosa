@@ -158,7 +158,6 @@ fn watched(net: &NetGame) -> Option<(String, Team)> {
     Some((player.name.clone(), player.team))
 }
 
-#[allow(clippy::too_many_arguments)]
 fn show_spectator_hud(
     mut commands: Commands,
     net: Res<NetGame>,

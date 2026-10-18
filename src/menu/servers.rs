@@ -90,8 +90,6 @@ pub struct JoinTarget {
     pub name: String,
     pub addr: SocketAddrV4,
     pub advertised: SocketAddrV4,
-    pub id: u32,
-    pub password: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -338,7 +336,7 @@ fn join_server(activate: On<Activate>, rows: Query<&ServerRow>, list: Option<Res
 
     info!("joining {} at {}", e.name, e.addr);
 
-    commands.insert_resource(JoinTarget { name: e.name.clone(), addr: e.addr, advertised: e.advertised, id: e.id, password: e.password });
+    commands.insert_resource(JoinTarget { name: e.name.clone(), addr: e.addr, advertised: e.advertised });
     commands.insert_resource(Join::start(e.password));
     next.set(Screen::Connecting);
 }

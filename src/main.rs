@@ -1,3 +1,11 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![allow(clippy::type_complexity)]
+#![allow(clippy::too_many_arguments)]
+
+#[cfg(windows)]
+use bevy::{ecs::system::NonSendMarker, window::PrimaryWindow};
+use bevy::prelude::*;
+
 mod audio;
 mod config;
 mod fonts;
@@ -9,11 +17,6 @@ mod net;
 mod steam;
 mod ui;
 mod rich_presence;
-
-use bevy::{
-    prelude::*,
-    render::view::screenshot::{Screenshot, save_to_disk},
-};
 
 fn main() {
     App::new()
@@ -35,24 +38,26 @@ fn main() {
         .add_systems(Startup, |mut commands: Commands| {
             commands.spawn((Camera2d, IsDefaultUiCamera));
         })
-        .add_systems(Update, screenshot_and_quit)
+        .add_systems(Update, set_window_icon)
         .run();
 }
 
-fn screenshot_and_quit(mut commands: Commands, time: Res<Time<Real>>, mut taken: Local<Option<f32>>) {
-    let Ok(path) = std::env::var("SCREENSHOT") else { return };
+#[cfg(windows)]
+fn set_window_icon(_: NonSendMarker, primary: Single<Entity, With<PrimaryWindow>>, mut done: Local<bool>) {
+    use winit::platform::windows::{IconExtWindows, WindowExtWindows};
 
-    let at = std::env::var("SCREENSHOT_SECS").ok().and_then(|s| s.parse().ok()).unwrap_or(1.0);
-    let now = time.elapsed_secs();
-
-    match *taken {
-        None if now >= at => {
-            commands.spawn(Screenshot::primary_window()).observe(save_to_disk(path));
-            *taken = Some(now);
-        }
-        Some(t) if now >= t + 1.0 => {
-            commands.write_message(AppExit::Success);
-        }
-        _ => {}
+    if *done {
+        return;
     }
+
+    bevy::winit::WINIT_WINDOWS.with_borrow(|windows| {
+        let Some(window) = windows.get_window(*primary) else { return };
+
+        if let Ok(icon) = winit::window::Icon::from_resource(1, None) {
+            window.set_window_icon(Some(icon.clone()));
+            window.set_taskbar_icon(Some(icon))
+        }
+
+        *done = true;
+    })
 }

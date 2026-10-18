@@ -98,7 +98,6 @@ impl Builder<'_> {
         part.indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn mesh(&mut self, mesh: &ferrosa_world::mesh::BlockMesh, chunk: Vec3, local: Vec3, origin: Vec3, bs: f32, turns: usize, slot: &dyn Fn(usize) -> Option<(usize, usize)>) {
         let positions: Vec<Vec3> = mesh.verts.iter().map(|p| chunk + bs * *p + local + origin).collect();
 
@@ -175,9 +174,7 @@ pub fn panes(map: &Map, origin: IVec3) -> Part {
     let mut part = Part::default();
     let Some(record) = area.record(origin.x, origin.y, origin.z) else { return part };
 
-    for cell in 0..512usize {
-        let v = record.layer1[cell];
-
+    for (cell, v) in record.layer1.iter().enumerate() {
         if v & TYPE_MASK != MESH {
             continue;
         }
@@ -195,7 +192,6 @@ pub fn panes(map: &Map, origin: IVec3) -> Part {
     part
 }
 
-// TODO: the merging of coplanar quads, and dropping faces against connected neighbours.
 pub fn build(map: &Map) -> Built {
     let area = &map.level.area;
     let bs = area.block_size;

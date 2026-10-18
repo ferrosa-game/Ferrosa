@@ -1,4 +1,4 @@
-use std::f64::consts::{FRAC_PI_2 as HALF_PI, PI, TAU};
+use std::{f32, f64::consts::{FRAC_PI_2 as HALF_PI, PI, TAU}};
 
 use bevy::{platform::collections::HashSet, prelude::*};
 use bevy_enhanced_input::prelude::*;
@@ -146,7 +146,7 @@ pub(super) mod flag {
 }
 
 const PHONE_DIALLING: i32 = 1;
-const MAX_YAW: f64 = 2.7488935718912502;
+const MAX_YAW: f64 = 2.748_893_571_891_25;
 const TURN: f32 = 0.001953125;
 const SLOT_KEYS: [Control; 5] = [Control::Row(1), Control::Row(2), Control::Row(3), Control::Row(4), Control::Row(5)];
 const DIAL_KEYS: [Control; 20] = [
@@ -391,23 +391,8 @@ fn gather_movement(look: Query<&Action<Look>>, zoom: Query<&Action<Zoom>>, mut i
     input.gathered_wheel += zoom.iter().map(|a| a.y).sum::<f32>();
 }
 
-fn angle_difference(mut a: f32, mut b: f32) -> f32 {
-    if !(((b - a) as f64) < PI) {
-        a = (a as f64 + TAU) as f32;
-    }
-    if !(((a - b) as f64) < PI) {
-        b = (b as f64 + TAU) as f32;
-    }
-    a - b
-}
-
-fn clamp_to(v: &mut f32, limit: f64) {
-    let d = *v as f64;
-    if !(-limit <= d) {
-        *v = -limit as f32;
-    } else if !(d <= limit) {
-        *v = limit as f32;
-    }
+fn angle_difference(a: f32, b: f32) -> f32 {
+    (a - b + PI as f32).rem_euclid(TAU as f32) - PI as f32
 }
 
 fn first_row(q: Quat) -> (f32, f32) {
@@ -507,7 +492,7 @@ fn view_pitch(p: &mut Player, input: &InputState, settings: &Settings) {
         p.aim_pitch[0] += input.dy * settings.pitch_scale;
     }
 
-    clamp_to(&mut p.aim_pitch[0], HALF_PI);
+    p.aim_pitch[0] = p.aim_pitch[0].clamp(-HALF_PI as f32, HALF_PI as f32);
 
     let (target, eased, speed) = (p.aim_pitch[0], p.aim_pitch[1], p.aim_pitch[2]);
     let d = ((target - eased) * 0.125).clamp(-0.03125, 0.03125);
@@ -623,10 +608,10 @@ fn walk(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, settin
 
     let p = &mut net.players[me];
 
-    clamp_to(&mut p.view_yaw_delta, MAX_YAW);
-    clamp_to(&mut p.view_pitch, HALF_PI);
-    clamp_to(&mut p.free_look_yaw, MAX_YAW);
-    clamp_to(&mut p.free_look_pitch, HALF_PI);
+    p.view_yaw_delta = p.view_yaw_delta.clamp(-MAX_YAW as f32, MAX_YAW as f32);
+    p.view_pitch = p.view_pitch.clamp(-HALF_PI as f32, HALF_PI as f32);
+    p.free_look_yaw = p.free_look_yaw.clamp(-MAX_YAW as f32, MAX_YAW as f32);
+    p.free_look_pitch = p.free_look_pitch.clamp(-HALF_PI as f32, HALF_PI as f32);
 
     let axis = |plus: Control, minus: Control| input.held(plus) as i32 as f32 - input.held(minus) as i32 as f32;
 
@@ -715,8 +700,8 @@ fn drive(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, setti
         p.gear_y = if p.gear_y < -0.375 { -1.0 } else if p.gear_y <= 0.375 { 0.0 } else { 1.0 };
     }
 
-    clamp_to(&mut p.view_yaw_delta, PI);
-    clamp_to(&mut p.view_pitch, HALF_PI);
+    p.view_yaw_delta = p.view_yaw_delta.clamp(-f32::consts::PI, f32::consts::PI);
+    p.view_pitch = p.view_pitch.clamp(-f32::consts::FRAC_PI_2, f32::consts::FRAC_PI_2);
 
     p.forward_back = if input.held(Control::Forward) {
         p.forward_back + 0.03125
@@ -778,8 +763,8 @@ fn fly(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, setting
         p.view_yaw_delta += slow * input.dx / 650.0;
         p.view_pitch += slow * input.dy / 650.0;
 
-        clamp_to(&mut p.view_yaw_delta, MAX_YAW);
-        clamp_to(&mut p.view_pitch, HALF_PI);
+        p.view_yaw_delta = p.view_yaw_delta.clamp(-MAX_YAW as f32, MAX_YAW as f32);
+        p.view_pitch = p.view_pitch.clamp(-HALF_PI as f32, HALF_PI as f32);
     } else {
         for s in &mut input.stick {
             *s = if *s < -1.0 { *s + 1.0 } else if *s <= 1.0 { 0.0 } else { *s - 1.0 };

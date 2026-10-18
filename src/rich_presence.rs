@@ -183,7 +183,7 @@ fn push_steam_presence(screen: Res<State<Screen>>, net: Option<Res<NetGame>>, ti
     presence.last_steam_send = Some(elapsed);
 }
 
-fn push_discord_presence(time: Res<Time<Real>>, screen: Res<State<Screen>>, net: Option<Res<NetGame>>, link: Res<DiscordLink>, mut presence: ResMut<Presence>, steam: Res<Steam>) {
+fn push_discord_presence(time: Res<Time<Real>>, screen: Res<State<Screen>>, net: Option<Res<NetGame>>, link: Res<DiscordLink>, mut presence: ResMut<Presence>) {
     if !link.connected.load(Ordering::Relaxed) {
         presence.sent = None;
         return;

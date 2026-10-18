@@ -53,8 +53,6 @@ pub struct ServerSync {
     pub weekday: u32,
     pub map: String,
     pub sun_angle: f32,
-    pub sun_tilt: f32,
-    pub move_delay: u32,
 }
 
 fn angle16(v: u16) -> f32 {
@@ -72,8 +70,6 @@ impl From<InitialSync> for ServerSync {
             weekday: s.weekday as u32,
             map: s.map_name,
             sun_angle: angle16(s.sun_angle),
-            sun_tilt: angle16(s.sun_axial_tilt),
-            move_delay: s.versus_movedelay.unwrap_or(0) as u32,
         }
     }
 }

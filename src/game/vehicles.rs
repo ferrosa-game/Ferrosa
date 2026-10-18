@@ -173,7 +173,6 @@ fn spawn_vehicle(commands: &mut Commands, assets: &AssetServer, types: &VehicleT
     }
 }
 
-#[allow(clippy::type_complexity)]
 fn sync_vehicles(
     mut commands: Commands,
     assets: Res<AssetServer>,
@@ -207,7 +206,6 @@ fn sync_vehicles(
     }
 }
 
-#[allow(clippy::type_complexity)]
 fn turn_wheels(
     mut commands: Commands,
     assets: Res<AssetServer>,

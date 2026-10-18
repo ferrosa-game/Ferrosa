@@ -290,7 +290,6 @@ fn break_pane(particles: &mut Particles, level: &mut Level, cell: IVec3, face: i
     true
 }
 
-#[allow(clippy::too_many_arguments)]
 fn emit_effects(
     mut commands: Commands,
     net: Res<NetGame>,

@@ -61,7 +61,6 @@ fn health_colour(health: i32) -> (f32, f32) {
     if health >= HALF_HEALTH { (1.0, (health - HALF_HEALTH) as f32 / HALF_HEALTH as f32) } else { (health as f32 / HALF_HEALTH as f32, 0.0) }
 }
 
-#[allow(clippy::type_complexity)]
 fn show_doll(
     net: Res<NetGame>,
     humans: Query<(&NetHuman, &HumanPose)>,

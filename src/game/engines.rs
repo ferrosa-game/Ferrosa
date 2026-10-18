@@ -61,7 +61,7 @@ fn hash_noise(n: i32) -> f32 {
     let n = n ^ (n << 13);
     let t = n.wrapping_mul(n).wrapping_mul(0x3d73).wrapping_add(0xc0ae5);
 
-    1.0 - ((t.wrapping_mul(t).wrapping_add(0x5208dd0d)) & 0x7fff_ffff) as f32 * 9.313_225_7e-10
+    1.0 - ((t.wrapping_mul(t).wrapping_add(0x5208dd0d)) & 0x7fff_ffff) as f32 * 9.313_226e-10
 }
 
 fn rotor(loop_index: usize) -> Vec<f32> {
@@ -136,7 +136,6 @@ fn start(speakers: &Speakers, clip: &SamplesBuffer, at: Vec3, radius: f32, ears:
     Some(emitter)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn hear_engines(
     net: Res<NetGame>,
     clips: Res<EngineClips>,

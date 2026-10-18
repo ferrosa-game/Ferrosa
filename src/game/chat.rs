@@ -347,7 +347,6 @@ fn bubble_size(line: &ChatLine, distance: f32) -> f32 {
     if line.kind == ChatType::ItemSpeak { loud * ITEM_BUBBLE } else { loud }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn show_bubbles(
     mut commands: Commands,
     net: Res<NetGame>,

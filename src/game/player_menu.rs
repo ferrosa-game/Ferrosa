@@ -111,7 +111,6 @@ fn focus_player_menu(keys: Res<ButtonInput<KeyCode>>, net: Res<NetGame>, state: 
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn build_player_menu(
     mut commands: Commands,
     net: Res<NetGame>,
