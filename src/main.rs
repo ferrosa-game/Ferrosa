@@ -12,6 +12,7 @@ mod fonts;
 mod game;
 mod character_model;
 mod masterserver;
+mod names;
 mod menu;
 mod net;
 mod steam;

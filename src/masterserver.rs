@@ -16,7 +16,7 @@ use ferrosa_protocol::{
     },
 };
 
-use crate::{config::Config, net::ClientSocket, steam::Steam};
+use crate::{config::Config, names::phone_number, net::ClientSocket, steam::Steam};
 
 const MASTERSERVER_SITE: &str = "www.crypticsea.com";
 const SERVERINFO_TIMEOUT: Duration = Duration::from_secs(3);
@@ -162,7 +162,7 @@ pub fn auth_status(master: Option<&MasterAuth>, steam: &Steam) -> String {
     match master.map(|m| (m.state, m.phone)) {
         None => "Connecting...".to_string(),
         Some((AuthState::Confirm, _)) => "Authenticating...".to_string(),
-        Some((AuthState::Done, phone)) => format!("Phone Number: {:03}-{:04}", phone / 10000, phone % 10000),
+        Some((AuthState::Done, phone)) => format!("Phone Number: {}", phone_number(phone)),
         Some((AuthState::Failed, _)) => "Auth Failed".to_string(),
 
         _ if !steam.ok() => "Steam Init Failed".to_string(),

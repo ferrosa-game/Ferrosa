@@ -88,7 +88,7 @@ fn stowed(item: &Item) -> bool {
     item.parent_human >= 0 && item.parent_slot > FIRST_POCKET
 }
 
-fn shown(net: &NetGame, item: &Item) -> bool {
+fn out_in_world(net: &NetGame, item: &Item) -> bool {
     let parent = usize::try_from(item.parent_item).ok().and_then(|p| net.items.get(p));
 
     !stowed(item) && parent.is_none_or(|p| !stowed(p))
@@ -123,7 +123,7 @@ fn sync_items(
     let mut drawn = vec![false; net.items.len()];
 
     for (e, ni, mut places, back, cash, face) in &mut items {
-        let Some(item) = net.items.get(ni.index).filter(|i| i.active && i.kind == Some(ni.kind) && shown(&net, i)) else {
+        let Some(item) = net.items.get(ni.index).filter(|i| i.active && i.kind == Some(ni.kind) && out_in_world(&net, i)) else {
             commands.entity(e).despawn();
             continue;
         };
@@ -154,7 +154,7 @@ fn sync_items(
         }
     }
 
-    for (i, item) in net.items.iter().enumerate().filter(|(i, item)| item.active && !drawn[*i] && shown(&net, item)) {
+    for (i, item) in net.items.iter().enumerate().filter(|(i, item)| item.active && !drawn[*i] && out_in_world(&net, item)) {
         let Some(kind) = item.kind else { continue };
         let Some(ty) = types.0.get(kind as usize) else { continue };
         let model = assets.load(GltfAssetLabel::Scene(0).from_asset(format!("models/items/{}.glb", model_name(kind as usize, &ty.name))));

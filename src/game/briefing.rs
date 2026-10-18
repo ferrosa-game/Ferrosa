@@ -11,7 +11,11 @@ use super::{
     items::ItemTypes,
     netgame::{Mission, NetGame, PROTECTOR, entities::Player},
 };
-use crate::{fonts::GameFonts, menu::Screen};
+use crate::{
+    fonts::GameFonts,
+    menu::Screen,
+    names::{corporation_name, phone_number},
+};
 
 const WHITE: [f32; 4] = [1.0; 4];
 const BLACK: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
@@ -185,20 +189,19 @@ fn show_notice(mut commands: Commands, net: Res<NetGame>, fonts: Res<GameFonts>,
     redraw(&mut commands, *e, layer, &fonts.rockwell, (!lines.is_empty()).then_some(lines), None);
 }
 
-fn corporation_name(team: i32) -> String {
+fn mission_team_name(team: i32) -> String {
     usize::try_from(team).ok().and_then(|t| Team::CORPORATION_NAMES.get(t)).map_or_else(|| format!("team {}", team + 1), |n| n.to_string())
 }
 
 fn info_card(p: &Player, lines: &mut Vec<Line>) {
     let at = |y: f32| Vec2::new(PANE_TEXT, y);
-    let number = p.phone_number as u32;
 
     lines.push(line(p.name.clone(), at(48.0), align::TOP_LEFT, LINE, BLACK));
-    lines.push(line(format!("{:03}-{:04}", number / 10000, number % 10000), at(64.0), align::TOP_LEFT, LINE, BLACK));
+    lines.push(line(phone_number(p.phone_number as u32), at(64.0), align::TOP_LEFT, LINE, BLACK));
     lines.push(line(format!("Corporate rating: {}", p.corporate_rating), at(80.0), align::TOP_LEFT, LINE, BLACK));
 
-    if let Some(name) = Team::CORPORATIONS.iter().position(|&t| t == p.team).and_then(|t| Team::CORPORATION_NAMES.get(t)) {
-        lines.push(line(*name, at(112.0), align::TOP_LEFT, LINE, BLACK));
+    if let Some(name) = corporation_name(p.team) {
+        lines.push(line(name, at(112.0), align::TOP_LEFT, LINE, BLACK));
     }
 
     lines.push(line(format!("${}", p.team_money), at(128.0), align::TOP_LEFT, LINE, BLACK));
@@ -248,7 +251,7 @@ fn mission_lines(m: &Mission, disk: &str, place: &dyn Fn(i32) -> Option<(String,
         }
         3 | 4 => {
             add("Transaction:");
-            add(&format!("We have received reports that {} has acquired a disk", corporation_name(m.team1)));
+            add(&format!("We have received reports that {} has acquired a disk", mission_team_name(m.team1)));
             add("containing information that will be beneficial to one of our");
 
             if m.kind == 3 {
@@ -262,7 +265,7 @@ fn mission_lines(m: &Mission, disk: &str, place: &dyn Fn(i32) -> Option<(String,
         }
         5 | 6 => {
             add("Three-way Deal:");
-            add(&format!("We have received reports that {} has acquired a disk", corporation_name(m.team1)));
+            add(&format!("We have received reports that {} has acquired a disk", mission_team_name(m.team1)));
             add("containing information that will be beneficial to one of our");
 
             if m.kind == 5 {
@@ -277,15 +280,15 @@ fn mission_lines(m: &Mission, disk: &str, place: &dyn Fn(i32) -> Option<(String,
         7 => {
             add("Double Disk:");
             add("We have acquired a disk that contains some of the data");
-            add(&format!("that {} is seeking.", corporation_name(m.team1)));
+            add(&format!("that {} is seeking.", mission_team_name(m.team1)));
             add("");
             add("Negotiate the best terms and execute the deal.");
             add(&format!("{disk}s value:               ${} Bonus", m.value));
         }
         8 | 9 => {
             add("Double Disk:");
-            add(&format!("We have received reports that {} and", corporation_name(m.team1)));
-            add(&format!("{} have each acquired a disk containing", corporation_name(m.team2)));
+            add(&format!("We have received reports that {} and", mission_team_name(m.team1)));
+            add(&format!("{} have each acquired a disk containing", mission_team_name(m.team2)));
             add("part of the data for a new technology we need.");
             add("We require both disks, one alone is worthless.");
             add("");

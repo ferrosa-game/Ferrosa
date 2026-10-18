@@ -13,7 +13,7 @@ use bevy::{
     },
 };
 
-use crate::ui::{checkbox::checkbox_ticks, slider::{slider_labels, slider_thumbs}, dropdown::{Dropdown, close_dropdowns, despawn_closed}, text::{MaskOf, password_masks}, window::WindowOrder};
+use crate::ui::{checkbox::checkbox_ticks, slider::{slider_labels, slider_thumbs}, dropdown::{Dropdown, close_dropdowns, despawn_closed}, text::password_masks, window::WindowOrder};
 
 pub mod radio;
 pub mod slider;

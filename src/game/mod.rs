@@ -67,7 +67,22 @@ impl Plugin for GamePlugin {
             vehicles::VehiclesPlugin,
             items::ItemsPlugin,
             smoothing::SmoothingPlugin,
-            (hud::HudPlugin, inventory::InventoryPlugin, paper_doll::PaperDollPlugin, doors::DoorsPlugin, sounds::SoundsPlugin, chat::ChatPlugin, voice::VoicePlugin, spectating::SpectatingPlugin, bullets::BulletsPlugin, street_objects::StreetObjectsPlugin, effects::EffectsPlugin, engines::EnginesPlugin, mute::MutePlugin, briefing::BriefingPlugin),
+            (
+                hud::HudPlugin,
+                inventory::InventoryPlugin,
+                paper_doll::PaperDollPlugin,
+                doors::DoorsPlugin,
+                sounds::SoundsPlugin,
+                chat::ChatPlugin,
+                voice::VoicePlugin,
+                spectating::SpectatingPlugin,
+                bullets::BulletsPlugin,
+                street_objects::StreetObjectsPlugin,
+                effects::EffectsPlugin,
+                engines::EnginesPlugin,
+                mute::MutePlugin,
+                briefing::BriefingPlugin
+            ),
         ))
         .add_plugins((eliminator::EliminatorPlugin, admin::AdminPlugin, item_displays::ScreensPlugin))
         .add_systems(Update, scale_ui.run_if(in_state(Screen::InGame)))

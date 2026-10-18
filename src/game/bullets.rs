@@ -10,6 +10,7 @@ use ferrosa_world::trace::line_intersect_level;
 
 use super::{
     Level,
+    effects::frame_across,
     netgame::{NetEvent, NetGame},
     network::NetTick,
     textures,
@@ -24,7 +25,6 @@ const DRAG: [f32; 4] = [0.004_560_367, 0.003_916_045_7, 0.007_952_156, 0.005_832
 const TRACER_LIFE: i32 = 3;
 const HOLE_LIFT: f32 = 0.015625;
 const RICOCHET: i32 = 0;
-const UPRIGHT: f32 = 0.707;
 
 struct Bullet {
     kind: usize,
@@ -97,13 +97,6 @@ fn spawn_shot_meshes(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, m
     commands.spawn((Mesh3d(tracers.clone()), MeshMaterial3d(materials.add(line)), NoFrustumCulling, DespawnOnExit(Screen::InGame)));
     commands.spawn((Mesh3d(holes.clone()), MeshMaterial3d(materials.add(hole)), NoFrustumCulling, DespawnOnExit(Screen::InGame)));
     commands.insert_resource(ShotMeshes { tracers, holes });
-}
-
-fn frame_across(n: Vec3) -> (Vec3, Vec3) {
-    let axis = if n.y.abs() >= UPRIGHT { Vec3::X } else { Vec3::Y };
-    let side = axis.cross(n).normalize_or_zero();
-
-    (side, n.cross(side).normalize_or_zero())
 }
 
 fn fly_bullets(net: Res<NetGame>, level: Option<Res<Level>>, mut shots: ResMut<Shots>, mut happenings: MessageReader<NetEvent>) {

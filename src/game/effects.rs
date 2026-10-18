@@ -184,7 +184,7 @@ fn byte() -> f32 {
     rand::random::<u8>() as f32
 }
 
-fn frame_across(n: Vec3) -> (Vec3, Vec3) {
+pub fn frame_across(n: Vec3) -> (Vec3, Vec3) {
     let axis = if n.y.abs() >= UPRIGHT { Vec3::X } else { Vec3::Y };
     let side = axis.cross(n).normalize_or_zero();
 

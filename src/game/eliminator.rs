@@ -10,7 +10,7 @@ use super::{
     mute::{Voice, VoiceIcons, voice_icon},
     netgame::NetGame,
 };
-use crate::{fonts::GameFonts, menu::Screen};
+use crate::{fonts::GameFonts, menu::Screen, names::phone_number};
 
 const PALE: [f32; 4] = [0.75, 0.75, 1.0, 1.0];
 const RED: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
@@ -144,11 +144,10 @@ fn show_eliminator(mut commands: Commands, net: Res<NetGame>, fonts: Res<GameFon
                 voice_icon(&mut commands, holder, &icons, voice, ICON, Some(row.player));
             }
 
-            let number = row.number as u32;
             let (node, shift) = anchored(align::TOP_LEFT, Vec2::new(776.0, y));
             commands.spawn((node, shift, text(row.name.clone(), &fonts.rockwell, 17.5, shade), ChildOf(screen)));
             let (node, shift) = anchored(align::TOP_LEFT, Vec2::new(776.0, y + 18.0));
-            commands.spawn((node, shift, text(format!("{:03}-{:04}", number / 10000, number % 10000), &fonts.rockwell, 10.0, shade), ChildOf(screen)));
+            commands.spawn((node, shift, text(phone_number(row.number as u32), &fonts.rockwell, 10.0, shade), ChildOf(screen)));
         }
     }
 

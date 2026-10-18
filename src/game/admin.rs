@@ -8,6 +8,7 @@ use super::{
 };
 use crate::{
     menu::Screen,
+    names::phone_number,
     ui::{self, Shortcut},
 };
 
@@ -90,8 +91,7 @@ fn build_page(mut commands: Commands, net: Res<NetGame>, mut page: ResMut<AdminP
             let list = at(&mut commands, screen, LIST_AT, FlexDirection::Column);
 
             for (k, name, number) in &rows {
-                let number = *number as u32;
-                admin_button(&mut commands, list, &format!("{name} {:03}-{:04}", number / 10000, number % 10000), ROW, AdminButton::Row(*k));
+                admin_button(&mut commands, list, &format!("{name} {}", phone_number(*number as u32)), ROW, AdminButton::Row(*k));
             }
         }
         Some(row) => {

@@ -11,6 +11,7 @@ use super::{
 use crate::{
     fonts::GameFonts,
     menu::Screen,
+    names::phone_number,
     ui::{self, Shortcut},
 };
 
@@ -175,10 +176,8 @@ fn fill_mute_list(mut commands: Commands, net: Res<NetGame>, fonts: Res<GameFont
             ..default()
         };
         let entry = commands.spawn((node, BackgroundColor(INSIDE), BorderColor::all(FRAME), Hovered::default(), MuteEntry, MuteToggle(*k), ChildOf(*list))).id();
-        let number = *number as u32;
-
         line(&mut commands, entry, name, &fonts.rockwell, if *speaking && !*muted { 16.0 } else { 12.0 });
-        line(&mut commands, entry, &format!("{:03}-{:04}", number / 10000, number % 10000), &fonts.rockwell, 12.0);
+        line(&mut commands, entry, &phone_number(*number as u32), &fonts.rockwell, 12.0);
 
         if *muted {
             line(&mut commands, entry, "MUTED", &fonts.rockwell, 16.0);

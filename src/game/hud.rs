@@ -16,6 +16,7 @@ use super::{
 use crate::{
     fonts::GameFonts,
     menu::{MENU_BACKGROUND, Screen},
+    names::corporation_index,
 };
 
 const DRIVING: u32 = 2;
@@ -422,7 +423,7 @@ fn show_menu_line(
     let corporation = world && CORPORATION_MENUS.contains(&(p.menu as i32)) && p.team != Team::Spectator;
     let has_menu = p.menu != MenuType::Empty;
 
-    let price = Team::CORPORATIONS.iter().position(|&t| t == p.team).map(|t| net.share_prices[t]);
+    let price = corporation_index(p.team).map(|t| net.share_prices[t]);
     let hint = has_menu && !open;
     let wealth = has_menu && open && !world;
 

@@ -13,6 +13,7 @@ use super::{
 use crate::{
     fonts::GameFonts,
     menu::Screen,
+    names::{TEAM_COLOURS, corporation_index, phone_number},
     ui::{self, Shortcut},
 };
 
@@ -20,7 +21,6 @@ const COLUMN: f32 = 248.0;
 const WIDE_COLUMN: f32 = 340.0;
 const COLUMNS_AT: Vec2 = Vec2::new(8.0, 80.0);
 const KEY: KeyCode = KeyCode::KeyH;
-const TEAM_COLOURS: [[f32; 3]; 3] = [[0.75, 0.5625, 0.1875], [0.1875, 0.375, 0.5625], [0.25, 0.25, 0.25]];
 const WATCHING: [f32; 3] = [1.0; 3];
 const ROUND_CORPORATIONS: [Team; 3] = [Team::Goldmen, Team::Monsota, Team::OXS];
 const DAYS: [&str; 7] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -61,18 +61,14 @@ impl Plugin for RosterPlugin {
 }
 
 fn worth(p: &Player, prices: &[i32; 6]) -> i32 {
-    match Team::CORPORATIONS.iter().position(|&t| t == p.team) {
+    match corporation_index(p.team) {
         Some(t) => (prices[t] as f32 / 10.0 * p.stocks as f32 + p.money as f32) as i32,
         None => p.money,
     }
 }
 
-fn phone_number(n: i32) -> String {
-    let n = n as u32;
-    format!("{:03}-{:04}", n / 10000, n % 10000)
-}
 
-fn shown(net: &NetGame, held: bool) -> bool {
+fn roster_open(net: &NetGame, held: bool) -> bool {
     let mode = net.sync.game_type;
     let peeking = matches!(mode, GameMode::Round | GameMode::World) && held;
 
@@ -104,7 +100,7 @@ fn roster(net: &NetGame) -> View {
             let team = ROUND_CORPORATIONS.get(column).copied();
             let colour = match column {
                 2 => TEAM_COLOURS[2].map(|c| c * 1.5),
-                _ => TEAM_COLOURS.get(column).copied().unwrap_or(WATCHING),
+                _ => ROUND_CORPORATIONS.get(column).map_or(WATCHING, |_| TEAM_COLOURS[column]),
             };
             let mut items = Vec::new();
 
@@ -136,7 +132,7 @@ fn roster(net: &NetGame) -> View {
                 let shade = colour.map(|c| c * dim);
                 let voice = (state != GameState::InGame).then(|| (Voice::of(p), (k as i32 != net.player).then_some(k)));
 
-                items.push(Item::Player { name: p.name.clone(), line: format!("{}  ${}", phone_number(p.phone_number), worth(p, prices)), colour: shade, voice });
+                items.push(Item::Player { name: p.name.clone(), line: format!("{}  ${}", phone_number(p.phone_number as u32), worth(p, prices)), colour: shade, voice });
             }
 
             items
@@ -157,7 +153,7 @@ fn show_roster(
     panels: Query<Entity, With<RosterPanel>>,
 ) {
     let typing = menu.is_some_and(|m| *m.get() == GameMenu::Chat);
-    let view = net.filter(|n| shown(n, keys.pressed(KEY) && !typing)).map(|n| roster(&n));
+    let view = net.filter(|n| roster_open(n, keys.pressed(KEY) && !typing)).map(|n| roster(&n));
 
     if view == last.0 {
         return;

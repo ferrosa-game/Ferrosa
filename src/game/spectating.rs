@@ -11,10 +11,8 @@ use super::{
     mute::{Voice, VoiceIcons, voice_icon},
     netgame::NetGame,
 };
-use crate::{fonts::GameFonts, menu::Screen};
+use crate::{fonts::GameFonts, menu::Screen, names::TEAM_COLOURS};
 
-const TEAM_COLOURS: [[f32; 3]; 8] =
-    [[0.75, 0.5625, 0.1875], [0.1875, 0.375, 0.5625], [0.25, 0.25, 0.25], [0.5625, 0.1875, 0.1875], [0.875, 0.875, 0.875], [0.125, 0.5, 0.125], [0.75, 0.75, 0.75], [0.25, 0.25, 0.25]];
 const WATCHED_FALLBACK: usize = 2;
 const LISTED_FALLBACK: usize = 6;
 const LIST_AT: Vec2 = Vec2::new(752.0, 64.0);
