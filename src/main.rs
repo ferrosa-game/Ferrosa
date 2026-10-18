@@ -4,7 +4,13 @@
 
 #[cfg(windows)]
 use bevy::{ecs::system::NonSendMarker, window::PrimaryWindow};
-use bevy::prelude::*;
+use bevy::{
+    prelude::*,
+    render::{
+        RenderPlugin,
+        settings::{Backends, WgpuSettings},
+    },
+};
 
 use crate::check_for_updates::{handle_update_task, spawn_update_check};
 
@@ -27,7 +33,8 @@ fn main() {
         .add_plugins(
             DefaultPlugins
                 .set(WindowPlugin { primary_window: Some(Window { title: "Ferrosa".into(), ..default() }), ..default() })
-                .set(AssetPlugin { file_path: "data".into(), ..default() }),
+                .set(AssetPlugin { file_path: "data".into(), ..default() })
+                .set(RenderPlugin { render_creation: render_settings().into(), ..default() }),
         )
         .insert_resource(ClearColor(menu::MENU_BACKGROUND))
         .add_plugins((config::ConfigPlugin, fonts::FontsPlugin, audio::DevicesPlugin))
@@ -45,6 +52,12 @@ fn main() {
         })
         .add_systems(Update, (set_window_icon, handle_update_task))
         .run();
+}
+
+fn render_settings() -> WgpuSettings {
+    let preferred = if cfg!(windows) { Backends::DX12 } else { Backends::all() };
+
+    WgpuSettings { backends: Some(Backends::from_env().unwrap_or(preferred)), ..default() }
 }
 
 #[cfg(windows)]

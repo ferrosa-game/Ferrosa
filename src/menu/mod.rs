@@ -94,7 +94,6 @@ fn main_menu(mut commands: Commands) {
     let p = page(&mut commands, Screen::Main);
 
     text(&mut commands, p, "Ferrosa", 48.0, Color::WHITE);
-    text(&mut commands, p, &format!("ALPHA {}{}", 38, (b'a' + 5) as char), 18.0, HEADING);
 
     gap(&mut commands, p, 32.0);
 
