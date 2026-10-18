@@ -32,9 +32,9 @@ const OTHER_FACE: i32 = 1;
 pub struct ItemTypes(pub Vec<ItemType>);
 
 #[derive(Component)]
-struct NetItem {
-    index: usize,
-    kind: ItemKind,
+pub struct NetItem {
+    pub index: usize,
+    pub kind: ItemKind,
 }
 
 #[derive(Component)]
@@ -113,7 +113,6 @@ fn phone_face(item: &Item) -> PhoneFace {
     PhoneFace(item.phone.2 == OTHER_FACE)
 }
 
-// TODO: the newspaper's, memo's, computer's and arcade's screens.
 fn sync_items(
     mut commands: Commands,
     assets: Res<AssetServer>,

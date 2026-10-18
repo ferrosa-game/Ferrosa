@@ -4,9 +4,14 @@ use ferrosa_protocol::{
     clientbound::game::{ItemKind, MenuButton, MenuType},
 };
 
-use super::{GAME_SCREEN, escape_menu::{GameMenu, PLAYER_MENU_LAYER}, items::ItemTypes, netgame::NetGame};
+use super::{
+    GAME_SCREEN, Level,
+    escape_menu::{GameMenu, PLAYER_MENU_LAYER},
+    items::ItemTypes,
+    netgame::NetGame,
+    vehicles::VehicleTypes,
+};
 use crate::{
-    menu::MENU_BACKGROUND,
     ui::{self, Shortcut},
 };
 
@@ -38,6 +43,21 @@ const SHARES: [i32; 4] = [1, 10, 100, 1000];
 const ENTER_CITY: i32 = 1;
 const RESPAWN_AT_BASE: i32 = 2;
 const READY: i32 = 5;
+const SHOP_BUTTON: Vec2 = Vec2::new(252.0, 28.0);
+const DESK_BUTTON: Vec2 = Vec2::new(252.0, 32.0);
+const BACK: i32 = 0x10;
+const BUY: i32 = 1;
+const SELL: i32 = 2;
+const SELL_CAR: i32 = 1;
+const DEPOSIT: i32 = 7;
+const WITHDRAWALS: [i32; 6] = [5, 10, 20, 50, 100, 1000];
+const DEALERSHIP: i32 = 3;
+const CLOTHING: i32 = 5;
+const GUN_STORE: i32 = 8;
+const BURGERS: i32 = 9;
+const COLOUR_NAMES: [&str; 6] = ["Black", "Red", "Blue", "Silver", "White", "Gold"];
+const CLOTHES: [&str; 5] = ["Blue Suit", "Red Suit", "White Suit", "Necklace", "Cash Necklace"];
+const WORN: [(u8, u8); 5] = [(3, 0), (8, 0), (7, 0), (0, 1), (0, 2)];
 
 #[derive(Component, Clone, Copy)]
 pub struct Choice(pub i32);
@@ -57,6 +77,10 @@ struct MenuView {
     can_spawn: bool,
     money: i32,
     buttons: Vec<MenuButton>,
+    building: i32,
+    stock: Vec<(i32, i32, i32)>,
+    suit: u8,
+    necklace: u8,
 }
 
 #[derive(Resource, Default)]
@@ -87,8 +111,18 @@ fn focus_player_menu(keys: Res<ButtonInput<KeyCode>>, net: Res<NetGame>, state: 
     }
 }
 
-fn build_player_menu(mut commands: Commands, net: Res<NetGame>, items: Option<Res<ItemTypes>>, mut shown: ResMut<ShownMenu>, panels: Query<Entity, With<PlayerMenuPanel>>) {
+#[allow(clippy::too_many_arguments)]
+fn build_player_menu(
+    mut commands: Commands,
+    net: Res<NetGame>,
+    items: Option<Res<ItemTypes>>,
+    vehicles: Option<Res<VehicleTypes>>,
+    level: Option<Res<Level>>,
+    mut shown: ResMut<ShownMenu>,
+    panels: Query<Entity, With<PlayerMenuPanel>>,
+) {
     let Some(p) = net.me() else { return };
+    let building = level.as_ref().and_then(|l| usize::try_from(p.menu_tab).ok().and_then(|t| l.map.level.buildings.get(t))).map_or(0, |b| b.kind);
 
     let view = MenuView {
         mode: net.sync.game_type,
@@ -98,6 +132,10 @@ fn build_player_menu(mut commands: Commands, net: Res<NetGame>, items: Option<Re
         can_spawn: p.spawn_timer <= 0,
         money: p.money,
         buttons: p.menu_buttons.clone(),
+        building,
+        stock: net.shops.get(&p.menu_tab).cloned().unwrap_or_default(),
+        suit: p.look.suit_color,
+        necklace: p.look.necklace,
     };
 
     if shown.0.as_ref() == Some(&view) {
@@ -106,9 +144,8 @@ fn build_player_menu(mut commands: Commands, net: Res<NetGame>, items: Option<Re
 
     panels.iter().for_each(|e| commands.entity(e).despawn());
 
-    let background = if view.menu == MenuType::Lobby { MENU_BACKGROUND } else { Color::NONE };
     let panel = commands
-        .spawn((Node { width: percent(100), height: percent(100), ..default() }, BackgroundColor(background), GlobalZIndex(PLAYER_MENU_LAYER), PlayerMenuPanel, DespawnOnExit(GameMenu::PlayerMenu)))
+        .spawn((Node { width: percent(100), height: percent(100), ..default() }, GlobalZIndex(PLAYER_MENU_LAYER), PlayerMenuPanel, DespawnOnExit(GameMenu::PlayerMenu)))
         .id();
     let price = |kind: ItemKind| items.as_ref().and_then(|t| t.0.get(kind as usize)).map_or(0, |t| t.price);
 
@@ -117,7 +154,14 @@ fn build_player_menu(mut commands: Commands, net: Res<NetGame>, items: Option<Re
         MenuType::Lobby => lobby(&mut commands, panel),
         menu if is_corporation_page(menu) && view.mode == GameMode::World => server_buttons(&mut commands, panel, &view),
         menu if is_corporation_page(menu) => requisition(&mut commands, panel, &view, &price),
-        // TODO: World's stock, store, car dealer and bank menus.
+        MenuType::WorldCarShop => car_shop(&mut commands, panel),
+        MenuType::WorldStore => {
+            let item_name = |k: i32| usize::try_from(k).ok().and_then(|k| items.as_ref()?.0.get(k)).map_or(String::new(), |t| t.name.clone());
+            let vehicle_name = |k: i32| usize::try_from(k).ok().and_then(|k| vehicles.as_ref()?.0.get(k)).map_or(String::new(), |t| t.name.clone());
+            store(&mut commands, panel, &view, &item_name, &vehicle_name);
+        }
+        MenuType::WorldStoreDone => sell_desk(&mut commands, panel, &view),
+        MenuType::WorldBank | MenuType::WorldBank2 => bank(&mut commands, panel, &view),
         _ => {}
     }
 
@@ -233,6 +277,69 @@ fn requisition(commands: &mut Commands, panel: Entity, view: &MenuView, price: &
     }
 
     done_button(commands, panel, 32.0, 440.0);
+}
+
+fn back_or_done(commands: &mut Commands, column: Entity, back: bool, size: Vec2) {
+    commands.spawn((Node { height: px(size.y - 4.0), ..default() }, ChildOf(column)));
+
+    if back {
+        choice(commands, column, "Back", BACK, size);
+    } else {
+        let b = ui::button(commands, column, "Done", size);
+        commands.entity(b).insert(Done);
+    }
+}
+
+fn car_shop(commands: &mut Commands, panel: Entity) {
+    let column = group(commands, panel, 4.0, 128.0, FlexDirection::Column);
+
+    choice(commands, column, "Buy", BUY, DESK_BUTTON);
+    choice(commands, column, "Sell", SELL, DESK_BUTTON);
+    back_or_done(commands, column, false, DESK_BUTTON);
+}
+
+fn store(commands: &mut Commands, panel: Entity, view: &MenuView, item_name: &dyn Fn(i32) -> String, vehicle_name: &dyn Fn(i32) -> String) {
+    let column = group(commands, panel, 4.0, 64.0, FlexDirection::Column);
+
+    for (i, &(what, cost, extra)) in view.stock.iter().enumerate() {
+        let label = match view.building {
+            DEALERSHIP => format!("{} {}", usize::try_from(extra).ok().and_then(|c| COLOUR_NAMES.get(c)).copied().unwrap_or(""), vehicle_name(what)),
+            CLOTHING => CLOTHES.get(i).copied().unwrap_or("").to_string(),
+            GUN_STORE => item_name(what),
+            BURGERS => "Burger".to_string(),
+            _ => continue,
+        };
+        let worn = view.building == CLOTHING && WORN.get(i).is_some_and(|&(suit, necklace)| (suit != 0 && view.suit == suit) || (necklace != 0 && view.necklace == necklace));
+        let b = choice(commands, column, &label, i as i32 + 1, SHOP_BUTTON);
+
+        with_price(commands, b, cost);
+        disabled_if(commands, b, view.money < cost || worn);
+    }
+
+    back_or_done(commands, column, view.building == DEALERSHIP, SHOP_BUTTON);
+}
+
+fn sell_desk(commands: &mut Commands, panel: Entity, view: &MenuView) {
+    let column = group(commands, panel, 4.0, 128.0, FlexDirection::Column);
+    let dealership = view.building == DEALERSHIP;
+
+    if dealership {
+        choice(commands, column, "Sell Car", SELL_CAR, DESK_BUTTON);
+    }
+
+    back_or_done(commands, column, dealership, DESK_BUTTON);
+}
+
+fn bank(commands: &mut Commands, panel: Entity, view: &MenuView) {
+    let column = group(commands, panel, 4.0, 128.0, FlexDirection::Column);
+
+    choice(commands, column, "Deposit", DEPOSIT, DESK_BUTTON);
+
+    for (k, amount) in WITHDRAWALS.into_iter().enumerate() {
+        choice(commands, column, &format!("Withdrawl ${amount}"), k as i32 + 1, DESK_BUTTON);
+    }
+
+    back_or_done(commands, column, view.menu == MenuType::WorldBank, DESK_BUTTON);
 }
 
 fn server_buttons(commands: &mut Commands, panel: Entity, view: &MenuView) {

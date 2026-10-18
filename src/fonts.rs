@@ -2,8 +2,8 @@ use bevy::{asset::AssetId, prelude::*};
 
 const VCR: &[u8] = include_bytes!("../data/fonts/vcr.ttf");
 const OSD_WHITE: &[u8] = include_bytes!("../data/fonts/osd-white.ttf");
-const ROCKWELL: &[u8] = include_bytes!("../data/fonts/rockwell.ttf");
-const FIXEDSYS: &[u8] = include_bytes!("../data/fonts/fixedsys.ttf");
+pub const ROCKWELL: &[u8] = include_bytes!("../data/fonts/rockwell.ttf");
+pub const FIXEDSYS: &[u8] = include_bytes!("../data/fonts/fixedsys.ttf");
 pub const OVERPASS: &[u8] = include_bytes!("../data/fonts/overpass.ttf");
 
 #[derive(Resource)]

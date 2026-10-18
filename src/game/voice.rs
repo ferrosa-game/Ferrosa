@@ -14,6 +14,7 @@ use rusty_opus::{Application, OpusDecoder, OpusEncoder};
 use super::{
     Level,
     chat::ChatState,
+    hud::{Stick, align, rect, spawn_screen},
     humans::{NetHuman, bone_at},
     netgame::{NetGame, VOICE_CHANNELS},
     network::NetTick,
@@ -48,6 +49,27 @@ const BLOCKED: f32 = 0.5;
 const SIGHT_EASE: f32 = 0.125;
 const THROUGH_ITEM: f32 = 1.0;
 const REACH: [f32; 3] = [2.0, 6.0, 16.0];
+const QUIETEST_DB: f32 = -48.0;
+const METER_FALL: f32 = 0.85;
+const METER_AT: Vec2 = Vec2::new(948.0, 36.0);
+const METER: Vec2 = Vec2::new(56.0, 8.0);
+const METER_GAP: f32 = 16.0;
+const LIT: Color = Color::srgb(0.3, 0.9, 0.3);
+const UNLIT: Color = Color::srgba(1.0, 1.0, 1.0, 0.2);
+const THRESHOLD: Color = Color::srgba(1.0, 1.0, 1.0, 0.8);
+const MIC: Color = Color::WHITE;
+
+#[derive(Resource, Default)]
+struct MicLevel(f32);
+
+#[derive(Component)]
+struct MeterScreen;
+
+#[derive(Component)]
+struct MeterFill;
+
+#[derive(Component)]
+struct MeterThreshold;
 
 struct Encoder {
     opus: Option<OpusEncoder>,
@@ -138,6 +160,9 @@ impl Plugin for VoicePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Microphone>()
             .init_resource::<Voices>()
+            .init_resource::<MicLevel>()
+            .add_systems(OnEnter(Screen::InGame), spawn_meter)
+            .add_systems(Update, show_meter.run_if(in_state(Screen::InGame)).run_if(resource_exists::<NetGame>))
             .add_systems(FixedUpdate, record.in_set(NetTick::Input))
             .add_systems(Update, play_voices.after(Smoothing::View).run_if(in_state(Screen::InGame)).run_if(resource_exists::<NetGame>))
             .add_systems(OnExit(Screen::InGame), |voices: Res<Voices>| voices.0.lock().map(|mut v| v.iter_mut().for_each(|c| *c = Channel::default())).unwrap_or_default());
@@ -159,10 +184,13 @@ fn record(
     chat: Res<ChatState>,
     keys: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
+    mut level: ResMut<MicLevel>,
 ) {
     let (Ok(mut encoder), Ok(mut captured)) = (mic.0.lock(), samples.0.lock()) else { return };
     let holding = config.voice_hold_to_talk != 0;
     let pressed = talking(&config, &keys, &mouse);
+
+    level.0 *= METER_FALL;
 
     for _ in 0..CAPTURES {
         if captured.len() < FRAME {
@@ -171,6 +199,9 @@ fn record(
 
         let frame: Vec<i16> = captured.drain(..FRAME).collect();
         let loud = frame.iter().any(|&s| (s as i32).abs() > config.voice_min);
+        let peak = frame.iter().map(|&s| (s as i32).abs()).max().unwrap_or(0);
+
+        level.0 = level.0.max(meter(peak));
 
         encoder.pcm.iter_mut().zip(&frame).for_each(|(p, &s)| *p = s as f32 / 32768.0);
 
@@ -191,6 +222,56 @@ fn record(
     }
 }
 
+fn meter(amplitude: i32) -> f32 {
+    let ratio = amplitude.max(1) as f32 / 32768.0;
+
+    ((20.0 * ratio.log10() - QUIETEST_DB) / -QUIETEST_DB).clamp(0.0, 1.0)
+}
+
+fn spawn_meter(mut commands: Commands) {
+    let screen = spawn_screen(&mut commands, MeterScreen, Stick::TopRight);
+    let mic = |commands: &mut Commands, at: Vec2, size: Vec2, round: f32| {
+        let node = Node { border_radius: BorderRadius::all(px(round)), ..rect(align::TOP_LEFT, METER_AT + at, size) };
+        commands.spawn((node, BackgroundColor(MIC), Pickable::IGNORE, ChildOf(screen)));
+    };
+
+    mic(&mut commands, Vec2::new(3.0, -4.0), Vec2::new(6.0, 10.0), 3.0);
+    mic(&mut commands, Vec2::new(5.0, 7.0), Vec2::new(2.0, 3.0), 0.0);
+    mic(&mut commands, Vec2::new(2.0, 10.0), Vec2::new(8.0, 2.0), 1.0);
+
+    let bar = METER_AT + Vec2::X * METER_GAP;
+    commands.spawn((rect(align::TOP_LEFT, bar, METER), BackgroundColor(UNLIT), Pickable::IGNORE, ChildOf(screen)));
+    commands.spawn((rect(align::TOP_LEFT, bar, Vec2::new(0.0, METER.y)), MeterFill, BackgroundColor(LIT), Pickable::IGNORE, ChildOf(screen)));
+    commands.spawn((rect(align::TOP_LEFT, bar - Vec2::Y * 2.0, Vec2::new(1.0, METER.y + 4.0)), MeterThreshold, BackgroundColor(THRESHOLD), Pickable::IGNORE, ChildOf(screen)));
+}
+
+fn show_meter(
+    net: Res<NetGame>,
+    config: Res<Config>,
+    level: Res<MicLevel>,
+    mut screen: Single<&mut Visibility, (With<MeterScreen>, Without<MeterThreshold>)>,
+    mut fill: Single<&mut Node, (With<MeterFill>, Without<MeterThreshold>)>,
+    threshold: Single<(&mut Node, &mut Visibility), With<MeterThreshold>>,
+) {
+    screen.set_if_neq(if net.silenced { Visibility::Hidden } else { Visibility::Inherited });
+
+    let width = px(METER.x * level.0);
+
+    if fill.width != width {
+        fill.width = width;
+    }
+
+    let (mut mark, mut shown) = threshold.into_inner();
+    let activation = config.voice_hold_to_talk == 0;
+    let left = px(METER_AT.x + METER_GAP + METER.x * meter(config.voice_min));
+
+    shown.set_if_neq(if activation { Visibility::Inherited } else { Visibility::Hidden });
+
+    if mark.left != left {
+        mark.left = left;
+    }
+}
+
 pub fn line_of_sight(level: &Level, from: Vec3, to: Vec3) -> f32 {
     let map = &level.map;
     let clear = from.distance(to) <= SIGHT_RANGE && line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, from, to).is_none();
@@ -200,7 +281,7 @@ pub fn line_of_sight(level: &Level, from: Vec3, to: Vec3) -> f32 {
 
 #[allow(clippy::too_many_arguments)]
 fn play_voices(
-    net: Res<NetGame>,
+    mut net: ResMut<NetGame>,
     voices: Res<Voices>,
     speakers: Res<Speakers>,
     ears: Res<Ears>,
@@ -208,12 +289,21 @@ fn play_voices(
     level: Option<Res<Level>>,
     humans: Query<(&NetHuman, &Transform, &HumanPose)>,
 ) {
+    let muted = |net: &NetGame, player: i32| usize::try_from(player).ok().and_then(|p| net.players.get(p)).is_some_and(|p| p.muted);
+    let speaking: Vec<i32> = net.voice.iter().filter(|c| c.active && !muted(&net, c.player)).map(|c| c.player).collect();
+    let (me, silenced) = (net.player, net.silenced);
+
+    for (k, p) in net.players.iter_mut().enumerate() {
+        p.is_speaking = speaking.contains(&(k as i32)) || (k as i32 == me && !silenced);
+    }
+
+    let net = &*net;
     let (Ok(mut channels), Some(mixer)) = (voices.0.lock(), speakers.0.as_ref()) else { return };
     let restarting = net.game_state == GameState::Restarting;
     let listener = (ears.left + ears.right) * 0.5;
 
     for (channel, sent) in channels.iter_mut().zip(&net.voice) {
-        if !sent.active {
+        if !sent.active || muted(net, sent.player) {
             *channel = Channel::default();
             continue;
         }

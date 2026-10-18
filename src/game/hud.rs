@@ -9,11 +9,14 @@ use ferrosa_protocol::{
 use super::{
     GAME_FPS, GAME_SCREEN,
     controls::{InputState, flag},
-    escape_menu::GameMenu,
+    escape_menu::{BACKDROP_LAYER, GameMenu, OVERLAY_LAYER},
     items::ItemTypes,
     netgame::{Human, NetGame, Player},
 };
-use crate::{fonts::GameFonts, menu::Screen};
+use crate::{
+    fonts::GameFonts,
+    menu::{MENU_BACKGROUND, Screen},
+};
 
 const DRIVING: u32 = 2;
 const PAIN_PER_SHADE: f32 = 64.0;
@@ -83,6 +86,9 @@ struct GearText;
 struct TimerScreen;
 
 #[derive(Component)]
+struct Backdrop;
+
+#[derive(Component)]
 struct RoundTimer;
 
 #[derive(Component)]
@@ -127,7 +133,7 @@ impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(Screen::InGame), spawn_hud).add_systems(
             Update,
-            (show_hud, (show_status, show_menu_line, show_phone_help, show_crosshair, show_aim, show_gauges, fade_for_damage, show_timer).run_if(resource_exists::<NetGame>)).chain().run_if(in_state(Screen::InGame)),
+            (show_hud, (show_status, show_menu_line, show_phone_help, show_crosshair, show_aim, show_gauges, fade_for_damage, show_timer, show_backdrop).run_if(resource_exists::<NetGame>)).chain().run_if(in_state(Screen::InGame)),
         );
     }
 }
@@ -247,11 +253,21 @@ fn spawn_hud(mut commands: Commands, fonts: Res<GameFonts>) {
     spawn_gauges(&mut commands, bottom, &fonts.rockwell);
 
     let top_right = spawn_screen(&mut commands, TimerScreen, Stick::TopRight);
+    commands.entity(top_right).insert(GlobalZIndex(OVERLAY_LAYER));
+
+    let backdrop = Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), ..default() };
+    commands.spawn((backdrop, Backdrop, BackgroundColor(MENU_BACKGROUND), Visibility::Hidden, GlobalZIndex(BACKDROP_LAYER), Pickable::IGNORE, DespawnOnExit(Screen::InGame)));
     let (node, shift) = anchored(align::RIGHT, TIMER_AT);
     commands.spawn((node, shift, RoundTimer, text("", &fonts.osd_white, 24.0, white), ChildOf(top_right)));
 
     let full = Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), ..default() };
     commands.spawn((full, DamageFade, BackgroundColor(Color::NONE), GlobalZIndex(DAMAGE_LAYER), Pickable::IGNORE, DespawnOnExit(Screen::InGame)));
+}
+
+fn show_backdrop(net: Res<NetGame>, mut backdrop: Single<&mut Visibility, With<Backdrop>>) {
+    let lobby = net.me().is_some_and(|p| p.menu == MenuType::Lobby);
+
+    shown(&mut backdrop, lobby || net.game_state == GameState::Restarting);
 }
 
 fn fade_for_damage(net: Res<NetGame>, mut fade: Single<&mut BackgroundColor, With<DamageFade>>) {
@@ -410,7 +426,7 @@ fn show_menu_line(
     let third = corporation.then(|| format!("Budget: ${}", p.budget));
 
     for (mut t, mut node, mut v) in &mut lines.p0() {
-        node.top = px(if hint { 24.0 } else { 4.0 });
+        node.top = px(4.0);
         set_text(&mut t, &mut v, first.clone());
     }
 

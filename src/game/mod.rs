@@ -1,10 +1,13 @@
+mod admin;
 mod blocks;
+mod briefing;
 mod bullets;
 mod camera;
 mod chat;
 mod controls;
 mod doors;
 mod effects;
+mod eliminator;
 mod engines;
 mod escape_menu;
 mod first_person;
@@ -12,6 +15,7 @@ mod hud;
 mod humans;
 mod inventory;
 mod items;
+mod mute;
 mod level;
 mod loading;
 pub mod netgame;
@@ -19,6 +23,7 @@ mod network;
 mod paper_doll;
 mod player_menu;
 mod roster;
+mod screens;
 mod sky;
 mod smoothing;
 mod spectating;
@@ -61,8 +66,9 @@ impl Plugin for GamePlugin {
             vehicles::VehiclesPlugin,
             items::ItemsPlugin,
             smoothing::SmoothingPlugin,
-            (hud::HudPlugin, inventory::InventoryPlugin, paper_doll::PaperDollPlugin, doors::DoorsPlugin, sounds::SoundsPlugin, chat::ChatPlugin, voice::VoicePlugin, spectating::SpectatingPlugin, bullets::BulletsPlugin, street_objects::StreetObjectsPlugin, effects::EffectsPlugin, engines::EnginesPlugin),
+            (hud::HudPlugin, inventory::InventoryPlugin, paper_doll::PaperDollPlugin, doors::DoorsPlugin, sounds::SoundsPlugin, chat::ChatPlugin, voice::VoicePlugin, spectating::SpectatingPlugin, bullets::BulletsPlugin, street_objects::StreetObjectsPlugin, effects::EffectsPlugin, engines::EnginesPlugin, mute::MutePlugin, briefing::BriefingPlugin),
         ))
+        .add_plugins((eliminator::EliminatorPlugin, admin::AdminPlugin, screens::ScreensPlugin))
         .add_systems(Update, scale_ui.run_if(in_state(Screen::InGame)))
         .add_systems(OnExit(Screen::InGame), |mut scale: ResMut<UiScale>| scale.0 = 1.0);
     }

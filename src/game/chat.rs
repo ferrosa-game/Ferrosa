@@ -15,7 +15,7 @@ use ferrosa_world::skeleton::BoneId;
 use super::{
     GAME_FPS,
     camera::GameCamera,
-    escape_menu::GameMenu,
+    escape_menu::{GameMenu, OVERLAY_LAYER},
     first_person::FirstPerson,
     hud::{HudScreen, Stick, align, anchored, colour, spawn_screen, text},
     humans::{NetHuman, bone_at},
@@ -107,13 +107,13 @@ impl Plugin for ChatPlugin {
 
 fn spawn_chat(mut commands: Commands, fonts: Res<GameFonts>) {
     let screen = spawn_screen(&mut commands, ChatScreen, Stick::BottomLeft);
-    commands.entity(screen).insert(Visibility::Inherited);
+    commands.entity(screen).insert((Visibility::Inherited, GlobalZIndex(OVERLAY_LAYER)));
 
     let (node, shift) = anchored(align::TOP_LEFT, LOG_AT);
     commands.spawn((Node { flex_direction: FlexDirection::Column, align_items: AlignItems::FlexStart, row_gap: px(2), ..node }, shift, ChatLog, Pickable::IGNORE, ChildOf(screen)));
 
     let top = spawn_screen(&mut commands, ChatScreen, Stick::Top);
-    commands.entity(top).insert(Visibility::Inherited);
+    commands.entity(top).insert((Visibility::Inherited, GlobalZIndex(OVERLAY_LAYER)));
 
     let (node, shift) = anchored(align::CENTRE_X, ANNOUNCE_AT);
     commands.spawn((Node { flex_direction: FlexDirection::Column, align_items: AlignItems::Center, ..node }, shift, Announcements, Pickable::IGNORE, ChildOf(top)));
@@ -271,7 +271,7 @@ fn open_chat(keys: Res<ButtonInput<KeyCode>>, mut state: ResMut<ChatState>, mut 
 
 fn open_entry(mut commands: Commands, net: Option<Res<NetGame>>, state: Res<ChatState>, mut focus: ResMut<InputFocus>) {
     let screen = spawn_screen(&mut commands, DespawnOnExit(GameMenu::Chat), Stick::BottomLeft);
-    commands.entity(screen).insert(Visibility::Inherited);
+    commands.entity(screen).insert((Visibility::Inherited, GlobalZIndex(OVERLAY_LAYER)));
 
     let playing = net.is_some_and(|n| n.me().is_some_and(|p| p.human >= 0));
     let label = if playing { format!("{}:", LEVELS[state.level as usize]) } else { "Chat:".to_string() };

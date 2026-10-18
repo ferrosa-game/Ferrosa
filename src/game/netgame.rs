@@ -1,4 +1,4 @@
-use std::net::SocketAddrV4;
+use std::{collections::HashMap, net::SocketAddrV4};
 
 use bevy::prelude::*;
 use ferrosa_protocol::{
@@ -42,6 +42,7 @@ const STALE: i32 = 0x270f;
 const CHAT_LINES: usize = 0x40;
 const CHAT_LENGTH: usize = 0x7f;
 const LONG_CHAT: f32 = 10.0;
+const MUTE_LIST: usize = 0x400;
 const SHORT_CHAT: f32 = 8.0;
 
 #[derive(Clone, Debug)]
@@ -68,6 +69,8 @@ pub struct Player {
     pub spawn_timer: i32,
     pub vitality: i32,
     pub display_inventory: [Vec<i32>; INVENTORY_SLOTS],
+    pub muted: bool,
+    pub is_speaking: bool,
     pub last_actions: i32,
     pub actions: Vec<Option<GameAction>>,
     pub action_head: i32,
@@ -117,6 +120,8 @@ impl Default for Player {
             spawn_timer: 0,
             vitality: 0,
             display_inventory: Default::default(),
+            muted: false,
+            is_speaking: false,
             last_actions: 0,
             actions: vec![None; ACTIONS],
             action_head: 0,
@@ -227,6 +232,12 @@ pub struct Item {
     pub tail: ItemTail,
     pub phone: (i32, i32, i32),
     pub children: Vec<i32>,
+    pub memo: Vec<u8>,
+    pub screen: Vec<(Vec<u8>, Vec<u8>)>,
+    pub current_line: i32,
+    pub top_line: i32,
+    pub cursor: i32,
+    pub text_version: u32,
 }
 
 impl Default for Item {
@@ -243,6 +254,12 @@ impl Default for Item {
             tail: ItemTail::None,
             phone: (0, 0, 0),
             children: Vec::new(),
+            memo: vec![0; MEMO_SIZE],
+            screen: Vec::new(),
+            current_line: 0,
+            top_line: 0,
+            cursor: -1,
+            text_version: 0,
         }
     }
 }
@@ -328,6 +345,41 @@ pub enum NetEvent {
 }
 
 const FRESH: u32 = 0x63;
+const LINKS: usize = 0x4001;
+const MEMO_SIZE: usize = 0x400;
+const MEMO_LINE: usize = 0x40;
+const SCREEN_LINES: usize = 0x20;
+const SCREEN_COLUMNS: usize = 0x3f;
+const ADMIN_ROWS: usize = 0x100;
+const ADMIN_NAME: usize = 0x20;
+pub const MISSION_SLOTS: usize = 0x10;
+const MISSION_CORPS: usize = 7;
+const RESULTS: usize = 8;
+const ROLE: i32 = 0;
+const TARGET: i32 = 1;
+const RESULT: i32 = 2;
+pub const PROTECTOR: i32 = 2;
+
+#[derive(Clone, Debug, Default)]
+pub struct Mission {
+    pub active: bool,
+    pub kind: i32,
+    pub disk_type: i32,
+    pub team1: i32,
+    pub team2: i32,
+    pub value: i32,
+    pub deadline: i32,
+    pub location: i32,
+    pub cash: i32,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct AdminRow {
+    pub filled: bool,
+    pub account: i32,
+    pub name: String,
+    pub phone_number: i32,
+}
 
 #[derive(Resource)]
 pub struct NetGame {
@@ -356,6 +408,7 @@ pub struct NetGame {
     pub team_doors: Vec<bool>,
     pub happenings: Vec<NetEvent>,
     pub chat: Vec<ChatLine>,
+    pub mute_list: Vec<i32>,
     pub decoder: ObjectDecoder,
     events: Vec<Option<Event>>,
     pub events_received: u32,
@@ -369,6 +422,15 @@ pub struct NetGame {
     pub voice_out_next: usize,
     pub silenced: bool,
     pub voice: Vec<VoiceChannel>,
+    link_ticks: Vec<Option<i32>>,
+    pub shops: HashMap<i32, Vec<(i32, i32, i32)>>,
+    pub admin_list: Vec<AdminRow>,
+    pub missions: Vec<Vec<Mission>>,
+    pub results: [[i32; 3]; RESULTS],
+    pub result_count: usize,
+    pub role: i32,
+    pub saviors: (i32, i32),
+    pub target: Option<Vec3>,
 }
 
 impl NetGame {
@@ -405,6 +467,16 @@ impl NetGame {
             team_doors: Vec::new(),
             happenings: Vec::new(),
             chat: Vec::new(),
+            mute_list: Vec::new(),
+            link_ticks: vec![None; LINKS],
+            shops: HashMap::new(),
+            admin_list: vec![AdminRow::default(); ADMIN_ROWS],
+            missions: vec![vec![Mission::default(); MISSION_SLOTS]; MISSION_CORPS],
+            results: [[0; 3]; RESULTS],
+            result_count: 0,
+            role: -1,
+            saviors: (0, 0),
+            target: None,
             decoder: ObjectDecoder::default(),
             events: vec![None; EVENTS],
             events_received: 0,
@@ -517,7 +589,6 @@ impl NetGame {
         socket.send(&frame_packet(LeaveGame), self.server);
     }
 
-    // TODO: packet 9's admin list.
     pub fn receive(&mut self, socket: &mut ClientSocket, now: u32) -> bool {
         self.silence += 1;
 
@@ -562,12 +633,13 @@ impl NetGame {
                 if let Some(p) = self.me_mut() {
                     p.is_admin = true;
                 }
+
+                self.read_admin_list(&mut r);
             }
             _ => {}
         }
     }
 
-    // TODO: the shop lists a store menu shows.
     fn apply(&mut self, p: ServerGamePacket, now: u32) {
         self.tick = p.ticks_since_reset as i32;
         self.game_state = p.gamestate;
@@ -608,7 +680,12 @@ impl NetGame {
         my_human.display_inventory = p.display_inventory.clone();
         my_human.menu_buttons = p.menu_buttons.clone();
 
+        if p.menu_type == MenuType::WorldStore {
+            self.shops.insert(p.menu_tab, p.shop.clone());
+        }
+
         self.objects(&p);
+        self.line_links(&p);
 
         for (channel, sent) in self.voice.iter_mut().zip(&p.voice) {
             let Some(sent) = sent else {
@@ -640,7 +717,6 @@ impl NetGame {
         self.rebuild_inventories();
     }
 
-    // TODO: the line links (memo and computer lines) and the voice channels.
     fn objects(&mut self, p: &ServerGamePacket) {
         for c in std::mem::take(&mut self.decoder.changes) {
             match c {
@@ -700,11 +776,27 @@ impl NetGame {
         for object in &p.items {
             let item = &mut self.items[object.item_id as usize & (ITEMS - 1)];
 
+            let shown = (item.current_line, item.top_line, item.cursor);
+
             if let Some(hd) = &object.header {
                 item.kind = Some(object.item_type);
                 item.parent_item = hd.parent_item;
                 item.parent_human = hd.parent_human;
                 item.parent_slot = hd.parent_slot as u32;
+
+                if let Some((current, top)) = hd.screen {
+                    (item.current_line, item.top_line) = (current, top);
+                }
+            }
+
+            match object.tail {
+                ItemTail::Radio(on) => item.top_line = on as i32,
+                ItemTail::Computer(cursor) => item.cursor = cursor,
+                _ => {}
+            }
+
+            if shown != (item.current_line, item.top_line, item.cursor) {
+                item.text_version = item.text_version.wrapping_add(1);
             }
 
             if item.has_history {
@@ -772,7 +864,72 @@ impl NetGame {
         }
     }
 
-    // TODO: the sounds and effects events make, cells, missions, stocks and the mute list.
+    // TODO: the level cell events (item sets taken and changed).
+    fn read_admin_list(&mut self, r: &mut Reader) {
+        for row in &mut self.admin_list {
+            let Ok(filled) = r.bits(1) else { return };
+            row.filled = filled != 0;
+
+            if row.filled {
+                let (Ok(account), Ok(name), Ok(phone)) = (r.i32(), r.bytes(ADMIN_NAME), r.i32()) else { return };
+                row.account = account;
+                row.name = String::from_utf8_lossy(name).trim_end_matches('\0').to_string();
+                row.phone_number = phone;
+            }
+        }
+    }
+
+    fn line_links(&mut self, p: &ServerGamePacket) {
+        for l in &p.line_links {
+            let index = (l.index as usize).min(LINKS - 1);
+
+            if self.link_ticks[index].is_some_and(|t| t > l.tick) {
+                continue;
+            }
+
+            self.link_ticks[index] = Some(l.tick);
+
+            let Some(item) = usize::try_from(l.item).ok().and_then(|i| self.items.get_mut(i)) else { continue };
+            let line = l.line.max(0) as usize;
+
+            match l.kind {
+                0 => {
+                    let at = line * MEMO_LINE;
+                    let n = l.text.len().min(MEMO_SIZE.saturating_sub(at));
+                    item.memo[at..at + n].copy_from_slice(&l.text[..n]);
+                    item.memo[MEMO_SIZE - 1] = 0;
+                }
+                1 if line < SCREEN_LINES => {
+                    let n = l.text.len().min(SCREEN_COLUMNS);
+
+                    if item.screen.len() <= line {
+                        item.screen.resize(line + 1, (Vec::new(), Vec::new()));
+                    }
+
+                    item.screen[line] = (l.text[..n].to_vec(), l.colors.iter().copied().take(n).collect());
+                }
+                _ => continue,
+            }
+
+            item.text_version = item.text_version.wrapping_add(1);
+        }
+    }
+
+    pub fn toggle_mute(&mut self, k: usize) {
+        let Some(p) = self.players.get_mut(k) else { return };
+        let number = p.phone_number;
+
+        p.muted = !p.muted;
+
+        if p.muted {
+            if !self.mute_list.contains(&number) && self.mute_list.len() < MUTE_LIST {
+                self.mute_list.push(number);
+            }
+        } else {
+            self.mute_list.retain(|&n| n != number);
+        }
+    }
+
     pub fn process_events(&mut self) {
         while self.events_played != self.events_received {
             if let Some(e) = self.events[self.events_played as usize].take() {
@@ -808,7 +965,9 @@ impl NetGame {
 
         match ev.kind {
             ServerEvent::Chat(event) => {
-                if fresh || matches!(event.chat_type, ChatType::EliminatorAnnouncement | ChatType::Notice) {
+                let muted = event.chat_type == ChatType::Announce && usize::try_from(event.speaker_id).ok().and_then(|p| self.players.get(p)).is_some_and(|p| p.muted);
+
+                if !muted && (fresh || matches!(event.chat_type, ChatType::EliminatorAnnouncement | ChatType::Notice)) {
                     info!("chat {:?}: {}", event.chat_type, event.message);
 
                     let life = if matches!(event.chat_type, ChatType::Announce | ChatType::AdminChat) { LONG_CHAT } else { SHORT_CHAT };
@@ -905,6 +1064,48 @@ impl NetGame {
                     player.name = event.name;
                 }
             }
+            ServerEvent::UpdateCorporation(event) => {
+                let slot = (event.a >> 1 & 7) as usize;
+                let Some(m) = self.missions.get_mut((event.a >> 4 & 0xf) as usize).and_then(|c| c.get_mut(slot)) else { return };
+
+                m.active = event.a & 1 != 0;
+
+                if m.active {
+                    m.kind = event.a >> 8 & 0xf;
+                    m.disk_type = event.a >> 16 & 0xff;
+                    m.team1 = event.b & 0xf;
+                    m.team2 = event.b >> 4 & 0xf;
+                    m.value = event.b >> 8;
+                    m.deadline = (event.c & 0xffff) * 60;
+                    m.location = (event.c as u32 >> 16) as i32 - 1;
+                    m.cash = event.d;
+                }
+            }
+            ServerEvent::MissionText(event) => {
+                if let Some(m) = self.missions.get_mut((event.corporation & 0xf) as usize).and_then(|c| c.get_mut((event.mission & 0xf) as usize)) {
+                    m.active = true;
+                }
+            }
+            ServerEvent::Mission(event) if event.player == self.player => {
+                let byte = |shift: i32| event.value >> shift & 0xff;
+
+                match event.kind {
+                    ROLE => {
+                        self.role = event.role;
+
+                        if event.role == PROTECTOR {
+                            self.saviors = (byte(0), byte(10));
+                        }
+                    }
+                    TARGET => self.target = Some(Vec3::from(event.pos)),
+                    RESULT => {
+                        let k = (event.role & 7) as usize;
+                        self.results[k] = [byte(0), byte(10), byte(20)];
+                        self.result_count = self.result_count.max(k + 1);
+                    }
+                    _ => {}
+                }
+            }
             ServerEvent::UpdateStock(event) => {
                 let [a, b, c] = event.prices;
                 self.share_prices[..5].copy_from_slice(&[a & 0xffff, a >> 16, b & 0xffff, b >> 16, c & 0xffff]);
@@ -915,6 +1116,7 @@ impl NetGame {
                 player.money = event.money;
                 player.stocks = event.stocks;
                 player.phone_number = event.phone_number as i32;
+                player.muted = self.mute_list.contains(&player.phone_number);
             }
             ServerEvent::TeamDoor(event) => {
                 if let Ok(team) = usize::try_from(event.team_id) {
@@ -956,6 +1158,11 @@ impl NetGame {
         self.decoder = ObjectDecoder::default();
         self.spectating = -1;
         self.team_doors.clear();
+        self.link_ticks.iter_mut().for_each(|t| *t = None);
+        self.missions.iter_mut().flatten().for_each(|m| m.active = false);
+        self.result_count = 0;
+        self.role = -1;
+        self.target = None;
 
         let menu = match self.sync.game_type {
             GameMode::Racing | GameMode::Round | GameMode::Eliminator | GameMode::CoOp | GameMode::Versus => MenuType::Lobby,

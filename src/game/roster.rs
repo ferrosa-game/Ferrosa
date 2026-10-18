@@ -6,12 +6,13 @@ use ferrosa_protocol::{
 
 use super::{
     escape_menu::{GameMenu, ROSTER_LAYER},
+    mute::{Voice, VoiceIcons, voice_icon},
     netgame::{NetGame, Player},
     player_menu::Choice,
 };
 use crate::{
     fonts::GameFonts,
-    menu::{MENU_BACKGROUND, Screen},
+    menu::Screen,
     ui::{self, Shortcut},
 };
 
@@ -27,11 +28,13 @@ const LAST_DAY: u32 = 5;
 const OBSERVER: i32 = 4;
 const JOIN_KEYS: [KeyCode; 3] = [KeyCode::Digit1, KeyCode::Digit2, KeyCode::Digit3];
 const BUTTON_HEIGHT: f32 = 28.0;
+const ICON: f32 = 24.0;
 
 #[derive(Clone, PartialEq)]
 enum Item {
     Text { text: String, size: f32, colour: [f32; 3] },
     Button { label: String, choice: i32, key: KeyCode },
+    Player { name: String, line: String, colour: [f32; 3], voice: Option<(Voice, Option<usize>)> },
 }
 
 #[derive(Clone, PartialEq, Default)]
@@ -39,7 +42,6 @@ struct View {
     day: Option<String>,
     winner: Option<(String, [f32; 3])>,
     columns: Vec<Vec<Item>>,
-    backed: bool,
 }
 
 #[derive(Component)]
@@ -85,7 +87,6 @@ fn text(text: String, size: f32, colour: [f32; 3]) -> Item {
     Item::Text { text, size, colour }
 }
 
-// TODO: each player's speaker (talking, muted, and a click to mute them) once voice is played.
 fn roster(net: &NetGame) -> View {
     let (state, prices) = (net.game_state, &net.share_prices);
     let me = net.me();
@@ -127,22 +128,22 @@ fn roster(net: &NetGame) -> View {
                 _ => {}
             }
 
-            let mut players: Vec<&Player> = net.players.iter().filter(|p| p.active && !p.is_bot && team.map_or(p.team == Team::Spectator, |t| p.team == t)).collect();
-            players.sort_by_key(|p| std::cmp::Reverse(worth(p, prices)));
+            let mut players: Vec<(usize, &Player)> = net.players.iter().enumerate().filter(|(_, p)| p.active && !p.is_bot && team.map_or(p.team == Team::Spectator, |t| p.team == t)).collect();
+            players.sort_by_key(|(_, p)| std::cmp::Reverse(worth(p, prices)));
 
-            for p in players {
+            for (k, p) in players {
                 let dim = if state == GameState::Intermission && !p.is_ready { 0.5 } else { 1.0 };
                 let shade = colour.map(|c| c * dim);
+                let voice = (state != GameState::InGame).then(|| (Voice::of(p), (k as i32 != net.player).then_some(k)));
 
-                items.push(text(p.name.clone(), 17.5, shade));
-                items.push(text(format!("{}  ${}", phone_number(p.phone_number), worth(p, prices)), 12.0, shade));
+                items.push(Item::Player { name: p.name.clone(), line: format!("{}  ${}", phone_number(p.phone_number), worth(p, prices)), colour: shade, voice });
             }
 
             items
         })
         .collect();
 
-    View { day, winner, columns, backed: state == GameState::Restarting }
+    View { day, winner, columns }
 }
 
 fn show_roster(
@@ -151,6 +152,7 @@ fn show_roster(
     menu: Option<Res<State<GameMenu>>>,
     net: Option<Res<NetGame>>,
     fonts: Res<GameFonts>,
+    icons: Res<VoiceIcons>,
     mut last: ResMut<Shown>,
     panels: Query<Entity, With<RosterPanel>>,
 ) {
@@ -164,7 +166,7 @@ fn show_roster(
     panels.iter().for_each(|e| commands.entity(e).despawn());
 
     if let Some(view) = &view {
-        spawn_roster(&mut commands, view, &fonts.rockwell);
+        spawn_roster(&mut commands, view, &fonts.rockwell, &icons);
     }
 
     last.0 = view;
@@ -174,10 +176,9 @@ fn spawn_text(commands: &mut Commands, parent: Entity, s: &str, font: &Handle<Fo
     commands.spawn((Text::new(s), TextFont::from_font_size(size).with_font(font.clone()), TextColor(Color::srgb(r, g, b)), node, Pickable::IGNORE, ChildOf(parent)));
 }
 
-fn spawn_roster(commands: &mut Commands, view: &View, font: &Handle<Font>) {
+fn spawn_roster(commands: &mut Commands, view: &View, font: &Handle<Font>, icons: &VoiceIcons) {
     let full = Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), ..default() };
-    let background = BackgroundColor(if view.backed { MENU_BACKGROUND } else { Color::NONE });
-    let panel = commands.spawn((full, background, Pickable::IGNORE, GlobalZIndex(ROSTER_LAYER), RosterPanel, DespawnOnExit(Screen::InGame))).id();
+    let panel = commands.spawn((full, Pickable::IGNORE, GlobalZIndex(ROSTER_LAYER), RosterPanel, DespawnOnExit(Screen::InGame))).id();
 
     if let Some(day) = &view.day {
         spawn_text(commands, panel, day, font, 20.0, WATCHING, Node { position_type: PositionType::Absolute, left: px(8), top: px(16), ..default() });
@@ -198,7 +199,7 @@ fn spawn_roster(commands: &mut Commands, view: &View, font: &Handle<Font>) {
         let node = Node { width: px(width), flex_direction: FlexDirection::Column, align_items: AlignItems::FlexStart, row_gap: px(2), ..default() };
         let column = commands.spawn((node, Pickable::IGNORE, ChildOf(corporations))).id();
 
-        spawn_items(commands, column, items, width, font);
+        spawn_items(commands, column, items, width, font, icons);
     }
 
     if let Some(items) = spectators {
@@ -214,11 +215,11 @@ fn spawn_roster(commands: &mut Commands, view: &View, font: &Handle<Font>) {
         };
         let column = commands.spawn((node, Pickable::IGNORE, ChildOf(panel))).id();
 
-        spawn_items(commands, column, items, COLUMN, font);
+        spawn_items(commands, column, items, COLUMN, font, icons);
     }
 }
 
-fn spawn_items(commands: &mut Commands, column: Entity, items: &[Item], width: f32, font: &Handle<Font>) {
+fn spawn_items(commands: &mut Commands, column: Entity, items: &[Item], width: f32, font: &Handle<Font>, icons: &VoiceIcons) {
     for item in items {
         match item {
             Item::Text { text, size, colour } => spawn_text(commands, column, text, font, *size, *colour, Node::default()),
@@ -226,6 +227,17 @@ fn spawn_items(commands: &mut Commands, column: Entity, items: &[Item], width: f
                 let spacer = commands.spawn((Node { margin: UiRect::vertical(px(6)), ..default() }, ChildOf(column))).id();
                 let b = ui::button(commands, spacer, label, Vec2::new(width - 16.0, BUTTON_HEIGHT));
                 commands.entity(b).insert((Choice(*choice), Shortcut(*key)));
+            }
+            Item::Player { name, line, colour, voice } => {
+                let row = commands.spawn((Node { column_gap: px(4), align_items: AlignItems::Center, ..default() }, Pickable::IGNORE, ChildOf(column))).id();
+
+                if let Some((voice, toggle)) = voice {
+                    voice_icon(commands, row, icons, *voice, ICON, *toggle);
+                }
+
+                let lines = commands.spawn((Node { flex_direction: FlexDirection::Column, ..default() }, Pickable::IGNORE, ChildOf(row))).id();
+                spawn_text(commands, lines, name, font, 17.5, *colour, Node::default());
+                spawn_text(commands, lines, line, font, 12.0, *colour, Node::default());
             }
         }
     }

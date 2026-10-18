@@ -10,9 +10,11 @@ use crate::{
 };
 
 const BUTTON: Vec2 = Vec2::new(240.0, 32.0);
-pub const PLAYER_MENU_LAYER: i32 = 2;
-pub const ROSTER_LAYER: i32 = 3;
-const MENU_LAYER: i32 = 4;
+pub const BACKDROP_LAYER: i32 = 2;
+pub const PLAYER_MENU_LAYER: i32 = 3;
+pub const ROSTER_LAYER: i32 = 4;
+pub const OVERLAY_LAYER: i32 = 5;
+pub const MENU_LAYER: i32 = 6;
 const BACK_BUTTON: Vec2 = Vec2::new(320.0, 44.0);
 const SHADE: Color = Color::srgba(0.0, 0.0, 0.0, 0.5);
 const OPTIONS_SHADE: Color = Color::srgba(0.035, 0.063, 0.082, 0.9);
@@ -26,11 +28,15 @@ pub enum GameMenu {
     Options,
     PlayerMenu,
     Chat,
+    Mute,
+    Admin,
 }
 
 #[derive(Component, Clone, Copy)]
 enum MenuButton {
     ReturnToGame,
+    Mute,
+    Admin,
     Options,
     ExitGame,
     Back,
@@ -60,8 +66,7 @@ fn menu_button(commands: &mut Commands, parent: Entity, label: &str, action: Men
     commands.entity(b).insert((action, Shortcut(key)));
 }
 
-// TODO: Mute Player (M) and, for admins, Admin (A).
-fn spawn_menu(mut commands: Commands) {
+fn spawn_menu(mut commands: Commands, net: Option<Res<NetGame>>) {
     let page = commands
         .spawn((
             Node {
@@ -80,6 +85,15 @@ fn spawn_menu(mut commands: Commands) {
         .id();
 
     menu_button(&mut commands, page, "Return to Game", MenuButton::ReturnToGame, KeyCode::Escape, BUTTON);
+
+    if let Some(me) = net.as_ref().and_then(|n| n.me()) {
+        menu_button(&mut commands, page, "Mute Player", MenuButton::Mute, KeyCode::KeyM, BUTTON);
+
+        if me.is_admin {
+            menu_button(&mut commands, page, "Admin", MenuButton::Admin, KeyCode::KeyA, BUTTON);
+        }
+    }
+
     menu_button(&mut commands, page, "Options", MenuButton::Options, KeyCode::KeyO, BUTTON);
     menu_button(&mut commands, page, "Exit Game", MenuButton::ExitGame, KeyCode::KeyE, BUTTON);
 }
@@ -106,6 +120,8 @@ fn on_button(
 
     match button {
         MenuButton::ReturnToGame => menu.set(GameMenu::Closed),
+        MenuButton::Mute => menu.set(GameMenu::Mute),
+        MenuButton::Admin => menu.set(GameMenu::Admin),
         MenuButton::Options => menu.set(GameMenu::Options),
         MenuButton::Back => menu.set(GameMenu::Open),
         MenuButton::ExitGame => {

@@ -8,6 +8,7 @@ use super::{
     escape_menu::GameMenu,
     first_person::FirstPerson,
     hud::{Stick, align, anchored, colour, spawn_screen, text},
+    mute::{Voice, VoiceIcons, voice_icon},
     netgame::NetGame,
 };
 use crate::{fonts::GameFonts, menu::Screen};
@@ -16,7 +17,7 @@ const TEAM_COLOURS: [[f32; 3]; 8] =
     [[0.75, 0.5625, 0.1875], [0.1875, 0.375, 0.5625], [0.25, 0.25, 0.25], [0.5625, 0.1875, 0.1875], [0.875, 0.875, 0.875], [0.125, 0.5, 0.125], [0.75, 0.75, 0.75], [0.25, 0.25, 0.25]];
 const WATCHED_FALLBACK: usize = 2;
 const LISTED_FALLBACK: usize = 6;
-const LIST_AT: Vec2 = Vec2::new(772.0, 64.0);
+const LIST_AT: Vec2 = Vec2::new(752.0, 64.0);
 const LINE: f32 = 20.0;
 const NO_ONE: i32 = -1;
 
@@ -36,7 +37,7 @@ struct WatchedName;
 struct Humanless;
 
 #[derive(Resource, Default, PartialEq)]
-struct Listed(Vec<(String, Team)>);
+struct Listed(Vec<(String, Team, Voice)>);
 
 pub struct SpectatingPlugin;
 
@@ -163,6 +164,7 @@ fn show_spectator_hud(
     net: Res<NetGame>,
     fp: Res<FirstPerson>,
     fonts: Res<GameFonts>,
+    icons: Res<VoiceIcons>,
     mut listed: ResMut<Listed>,
     mut screens: Query<&mut Visibility, (With<SpectatorScreen>, Without<WatchedLines>)>,
     mut lines: Single<&mut Visibility, With<WatchedLines>>,
@@ -190,7 +192,7 @@ fn show_spectator_hud(
         c.set_if_neq(TextColor(team_colour(team, WATCHED_FALLBACK)));
     }
 
-    let now = Listed(net.players.iter().filter(|p| p.active && !p.is_bot && p.human < 0).map(|p| (p.name.clone(), p.team)).collect());
+    let now = Listed(net.players.iter().filter(|p| p.active && !p.is_bot && p.human < 0).map(|p| (p.name.clone(), p.team, Voice::of(p))).collect());
 
     if *listed == now {
         return;
@@ -198,8 +200,11 @@ fn show_spectator_hud(
 
     commands.entity(*list).despawn_children();
 
-    for (who, team) in &now.0 {
-        commands.spawn((Node { height: px(LINE), ..default() }, shadowed(who.clone(), &fonts.rockwell, LINE, team_colour(*team, LISTED_FALLBACK)), ChildOf(*list)));
+    for (who, team, voice) in &now.0 {
+        let row = commands.spawn((Node { height: px(LINE), align_items: AlignItems::Center, ..default() }, Pickable::IGNORE, ChildOf(*list))).id();
+
+        voice_icon(&mut commands, row, &icons, *voice, LINE, None);
+        commands.spawn((shadowed(who.clone(), &fonts.rockwell, LINE, team_colour(*team, LISTED_FALLBACK)), ChildOf(row)));
     }
 
     *listed = now;
