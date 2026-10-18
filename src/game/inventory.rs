@@ -42,8 +42,6 @@ const HANDS: usize = 2;
 const POCKET_ITEMS: usize = 2;
 const SWAPPING_HANDS: i32 = 1;
 const POCKETING: i32 = 2;
-const MOVE_LENGTH: f32 = 100.0;
-const SELECTED_SCALE: f32 = 1.125;
 
 #[derive(Resource)]
 struct ItemIcons(HashMap<ItemKind, Handle<Image>>);
@@ -131,10 +129,12 @@ fn show_inventory(
 
 fn spawn_slots(commands: &mut Commands, panel: Entity, view: &View, types: &ItemTypes, icons: &ItemIcons, fonts: &GameFonts) {
     let shade = BackgroundColor(hud::colour([0.0, 0.0, 0.0, 0.25]));
+    let frame = |at: Vec2, border: UiRect| (Node { border, ..rect(align::BOTTOM_CENTRE, at, BOX) }, shade, BorderColor::all(Color::WHITE));
     let small = |s: String, at: Vec2, size: f32| {
         let (node, shift) = anchored(align::BOTTOM, at);
         (node, shift, text(s, &fonts.osd_white, size, Color::WHITE))
     };
+
     let icon = |kind: Option<ItemKind>, at: Vec2, scale: f32, tint: Color| {
         let image = kind.and_then(|k| icons.0.get(&k)).cloned()?;
         Some((rect(align::BOTTOM_CENTRE, at, BOX * scale), ImageNode::new(image).with_color(tint), Pickable::IGNORE))
@@ -143,7 +143,7 @@ fn spawn_slots(commands: &mut Commands, panel: Entity, view: &View, types: &Item
     for (slot, items) in view.slots.iter().enumerate().take(HANDS) {
         let at = slot_at(slot);
 
-        commands.spawn((rect(align::BOTTOM_CENTRE, at + Vec2::X * 8.0, BOX), shade, ChildOf(panel)));
+        commands.spawn((frame(at + Vec2::X * 8.0, UiRect::all(px(1.0))), ChildOf(panel)));
 
         for &(kind, count) in items {
             let pin_pulled = count == 0 && kind == Some(ItemKind::Grenade);
@@ -158,6 +158,7 @@ fn spawn_slots(commands: &mut Commands, panel: Entity, view: &View, types: &Item
                 commands.spawn((small(count.to_string(), at + Vec2::X * 16.0, 8.0), ChildOf(panel)));
             } else if count > 0 && kind != Some(ItemKind::BriefcaseOpen) {
                 let note = if count == 1 { "+magazine" } else { "+empty magazine" };
+
                 commands.spawn((small(note.to_string(), at + Vec2::X * 8.0, 8.0), ChildOf(panel)));
             }
         }
@@ -167,14 +168,16 @@ fn spawn_slots(commands: &mut Commands, panel: Entity, view: &View, types: &Item
         let at = slot_at(slot);
 
         for row in 0..POCKET_ITEMS {
-            commands.spawn((rect(align::BOTTOM_CENTRE, at + Vec2::new(8.0, 32.0 * row as f32), BOX), shade, ChildOf(panel)));
+            let border = if row == 0 { UiRect { bottom: px(0.0), ..UiRect::all(px(1.0)) } } else { UiRect { top: px(0.0), ..UiRect::all(px(1.0)) } };
+
+            commands.spawn((frame(at + Vec2::new(8.0, 32.0 * row as f32), border), ChildOf(panel)));
         }
 
         commands.spawn((small((slot - 1).to_string(), at - Vec2::Y * 32.0, 12.0), ChildOf(panel)));
 
         for (row, &(kind, _)) in items.iter().enumerate() {
             let selected = row == 0 && view.selected == Some(slot);
-            let (scale, tint) = if selected { (SELECTED_SCALE, Color::srgb(0.0, 1.0, 0.0)) } else { (1.0, Color::WHITE) };
+            let (scale, tint) = if selected { (1.125, Color::srgb(0.0, 1.0, 0.0)) } else { (1.0, Color::WHITE) };
 
             if let Some(bundle) = icon(kind, at + Vec2::new(8.0, 32.0 * row as f32), scale, tint) {
                 commands.spawn((bundle, ChildOf(panel)));
@@ -188,15 +191,17 @@ fn fly_item(net: Res<NetGame>, icons: Res<ItemIcons>, flying: Single<(&mut Node,
 
     let route = own(&net).and_then(|(p, _, own)| {
         let hand = own.action_hand as usize & 7;
+
         let (from, to) = match own.action_type {
             POCKETING if p.display_inventory.get(hand).is_some_and(|s| !s.is_empty()) => (hand, own.action_slot as usize + HANDS),
             POCKETING => (own.action_slot as usize + HANDS, hand),
             SWAPPING_HANDS => (hand, (own.action_hand ^ 1) as usize & 7),
             _ => return None,
         };
+
         let (kind, _) = entry(*p.display_inventory.get(from)?.first()?);
         let to = to.min(INVENTORY_SLOTS - 1);
-        let t = own.action_duration as f32 / MOVE_LENGTH;
+        let t = own.action_duration as f32 / 100.0;
 
         Some((icons.0.get(&kind?)?.clone(), slot_at(from).lerp(slot_at(to), t)))
     });
