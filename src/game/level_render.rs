@@ -7,6 +7,8 @@ use bevy::{
     prelude::*,
 };
 
+use ferrosa_world::{collide::calculate_face_normal, track::Track};
+
 use super::{
     Level,
     blocks::{self, Part},
@@ -27,6 +29,15 @@ const DARK: Color = Color::srgb(0.06, 0.06, 0.06);
 const MISSING: Color = Color::srgb(1.0, 0.25, 0.5);
 const DARK_MATERIAL: usize = 2;
 const SHARPEST_SEAM: u32 = 32;
+const TRACK_MAP: &str = "test2";
+const TUBE: i32 = 0;
+const RAMP: i32 = 1;
+const RAIL_PART: usize = 0;
+const WALL_PART: usize = 2;
+const RAIL_LIFT: f32 = 0.125;
+const WALL_MATERIAL: usize = 0;
+const RAMP_MATERIAL: usize = 1;
+const RAIL_MATERIAL: usize = 2;
 
 #[derive(Component)]
 pub struct BlockPanes {
@@ -54,7 +65,7 @@ pub struct LevelPlugin;
 
 impl Plugin for LevelPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(Screen::InGame), (make_materials, spawn_blocks, spawn_terrain, spawn_water).chain())
+        app.add_systems(OnEnter(Screen::InGame), (make_materials, spawn_blocks, spawn_track, spawn_terrain, spawn_water).chain())
             .add_systems(OnExit(Screen::InGame), |mut commands: Commands| {
                 commands.remove_resource::<Level>();
                 commands.remove_resource::<BlockMaterials>();
@@ -160,6 +171,52 @@ fn make_materials(mut commands: Commands, level: Res<Level>, geometry: Res<Level
 
     commands.insert_resource(AsphaltMaterial(blocks[blocks::ASPHALT].clone()));
     commands.insert_resource(BlockMaterials { blocks, facades, glass });
+}
+
+fn track_part(track: &Track, kind: Option<i32>, part: usize, lift: f32) -> Option<Mesh> {
+    let (mut positions, mut normals, mut uvs) = (Vec::new(), Vec::new(), Vec::new());
+
+    for (i, m) in track.meshes.iter().enumerate() {
+        if kind.is_some_and(|k| k != m.kind) {
+            continue;
+        }
+
+        let corners = if i & 1 != 0 { [[0.0, 1.0], [0.0, 0.0], [1.0, 0.0]] } else { [[0.0, 1.0], [1.0, 0.0], [1.0, 1.0]] };
+
+        for j in m.pieces[part]..m.pieces[part + 4] {
+            let Some(tri) = usize::try_from(j).ok().and_then(|j| m.tris.get(j)) else { continue };
+            let p = tri.map(|v| usize::try_from(v).ok().and_then(|v| m.verts.get(v)).copied().unwrap_or_default());
+            let n = calculate_face_normal(p[0], p[1], p[2]);
+
+            for (corner, uv) in p.iter().zip(corners) {
+                positions.push([corner.x, corner.y + lift, corner.z]);
+                normals.push(n.to_array());
+                uvs.push([uv[0], 1.0 - uv[1]]);
+            }
+        }
+    }
+
+    if positions.is_empty() {
+        return None;
+    }
+
+    let indices = (0..positions.len() as u32).collect();
+
+    Some(mesh(positions, normals, Some(uvs), indices))
+}
+
+fn spawn_track(mut commands: Commands, level: Res<Level>, materials: Res<BlockMaterials>, mut meshes: ResMut<Assets<Mesh>>) {
+    if level.map.map_name != TRACK_MAP {
+        return;
+    }
+
+    let track = Track::race_track();
+
+    for (kind, part, lift, material) in [(Some(TUBE), WALL_PART, 0.0, WALL_MATERIAL), (None, RAIL_PART, RAIL_LIFT, RAIL_MATERIAL), (Some(RAMP), WALL_PART, 0.0, RAMP_MATERIAL)] {
+        if let Some(m) = track_part(&track, kind, part, lift) {
+            commands.spawn((Mesh3d(meshes.add(m)), MeshMaterial3d(materials.block(material)), DespawnOnExit(Screen::InGame)));
+        }
+    }
 }
 
 fn spawn_blocks(mut commands: Commands, mut geometry: ResMut<LevelGeometry>, materials: Res<BlockMaterials>, mut meshes: ResMut<Assets<Mesh>>) {

@@ -279,7 +279,6 @@ impl NetGame {
         }
     }
 
-    // TODO: the level cell events (item sets taken and changed).
     fn read_admin_list(&mut self, r: &mut Reader) {
         for row in &mut self.admin_list {
             let Ok(filled) = r.bits(1) else { return };

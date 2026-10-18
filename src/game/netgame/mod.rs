@@ -61,6 +61,12 @@ impl Default for VoiceChannel {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum CellChange {
+    Taken { cell: IVec3, mask: u32 },
+    ItemSet { cell: IVec3, value: u32 },
+}
+
 #[derive(Clone, Debug)]
 pub struct ChatLine {
     pub kind: ChatType,
@@ -143,6 +149,7 @@ pub struct NetGame {
     pub traffic_count: u32,
     pub signals: Vec<[i32; 4]>,
     pub team_doors: Vec<bool>,
+    pub cell_changes: Vec<CellChange>,
     pub happenings: Vec<NetEvent>,
     pub chat: Vec<ChatLine>,
     pub mute_list: Vec<i32>,
@@ -204,6 +211,7 @@ impl NetGame {
             traffic_count: 0,
             signals: vec![[0; 4]; 0x400],
             team_doors: Vec::new(),
+            cell_changes: Vec::new(),
             happenings: Vec::new(),
             chat: Vec::new(),
             mute_list: Vec::new(),
@@ -272,6 +280,7 @@ impl NetGame {
         self.decoder = ObjectDecoder::default();
         self.spectating = -1;
         self.team_doors.clear();
+        self.cell_changes.clear();
         self.link_ticks.iter_mut().for_each(|t| *t = None);
         self.missions.iter_mut().flatten().for_each(|m| m.active = false);
         self.result_count = 0;

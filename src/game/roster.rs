@@ -5,6 +5,7 @@ use ferrosa_protocol::{
 };
 
 use super::{
+    computer::AtComputer,
     escape_menu::{GameMenu, ROSTER_LAYER},
     mute::{Voice, VoiceIcons, voice_icon},
     netgame::{NetGame, entities::Player},
@@ -149,10 +150,11 @@ fn show_roster(
     net: Option<Res<NetGame>>,
     fonts: Res<GameFonts>,
     icons: Res<VoiceIcons>,
+    at_computer: Res<AtComputer>,
     mut last: ResMut<Shown>,
     panels: Query<Entity, With<RosterPanel>>,
 ) {
-    let typing = menu.is_some_and(|m| *m.get() == GameMenu::Chat);
+    let typing = menu.is_some_and(|m| *m.get() == GameMenu::Chat) || at_computer.typing();
     let view = net.filter(|n| roster_open(n, keys.pressed(KEY) && !typing)).map(|n| roster(&n));
 
     if view == last.0 {

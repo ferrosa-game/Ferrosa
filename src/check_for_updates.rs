@@ -36,7 +36,7 @@ pub fn spawn_update_check(mut commands: Commands) {
         let current_hash = env!("GIT_HASH");
 
         let res: serde_json::Value = client
-            .get("https://api.github.com/repos/ferrosa-game/dedicated-server/releases/latest")
+            .get("https://api.github.com/repos/ferrosa-game/ferrosa/releases/latest")
             .send()
             .ok()?
             .json()
@@ -46,7 +46,7 @@ pub fn spawn_update_check(mut commands: Commands) {
         let page = res.get("html_url")?.as_str()?.to_string();
 
         let compare_url = format!(
-            "https://api.github.com/repos/ferrosa-game/dedicated-server/compare/{}...{}",
+            "https://api.github.com/repos/ferrosa-game/ferrosa/compare/{}...{}",
             current_hash, latest_tag
         );
 

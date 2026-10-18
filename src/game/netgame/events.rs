@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use ferrosa_protocol::clientbound::game::{ItemKind, events::{ServerEvent, Event, chat::ChatType}};
 
-use crate::game::netgame::{CHAT_LENGTH, CHAT_LINES, ChatLine, FRESH, ITEMS, LONG_CHAT, NetEvent, NetGame, PLAYERS, PROTECTOR, RESULT, ROLE, SHORT_CHAT, TARGET, entities::Track};
+use crate::game::netgame::{CHAT_LENGTH, CellChange, CHAT_LINES, ChatLine, FRESH, ITEMS, LONG_CHAT, NetEvent, NetGame, PLAYERS, PROTECTOR, RESULT, ROLE, SHORT_CHAT, TARGET, entities::Track};
 
 impl NetGame {
     pub fn process_events(&mut self) {
@@ -191,6 +191,12 @@ impl NetGame {
                 player.stocks = event.stocks;
                 player.phone_number = event.phone_number as i32;
                 player.muted = self.mute_list.contains(&player.phone_number);
+            }
+            ServerEvent::ItemSetCell(event) if event.area == 0 => {
+                self.cell_changes.push(CellChange::Taken { cell: IVec3::new(event.block_x, event.block_y, event.block_z), mask: event.taken });
+            }
+            ServerEvent::SetBlockCell(event) if event.area == 0 => {
+                self.cell_changes.push(CellChange::ItemSet { cell: IVec3::new(event.block_x, event.block_y, event.block_z), value: event.value });
             }
             ServerEvent::TeamDoor(event) => {
                 if let Ok(team) = usize::try_from(event.team_id) {

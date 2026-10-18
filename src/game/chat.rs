@@ -15,6 +15,7 @@ use ferrosa_world::skeleton::BoneId;
 use super::{
     GAME_FPS,
     camera::GameCamera,
+    computer::AtComputer,
     escape_menu::{GameMenu, OVERLAY_LAYER},
     first_person::FirstPerson,
     hud::{HudScreen, Stick, align, anchored, colour, spawn_screen, text},
@@ -259,7 +260,11 @@ fn show_level(state: Res<ChatState>, mut level: Single<(&mut Text, &mut Visibili
     }
 }
 
-fn open_chat(keys: Res<ButtonInput<KeyCode>>, mut state: ResMut<ChatState>, mut next: ResMut<NextState<GameMenu>>) {
+fn open_chat(keys: Res<ButtonInput<KeyCode>>, at_computer: Res<AtComputer>, mut state: ResMut<ChatState>, mut next: ResMut<NextState<GameMenu>>) {
+    if at_computer.typing() {
+        return;
+    }
+
     if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::NumpadEnter) {
         next.set(GameMenu::Chat);
     }

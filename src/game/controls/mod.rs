@@ -8,6 +8,7 @@ use ferrosa_protocol::{
 };
 
 use super::{
+    computer::AtComputer,
     escape_menu::GameMenu,
     first_person::FirstPerson,
     netgame::{NetGame, entities::Player},
@@ -363,14 +364,16 @@ fn switch_controls(
     mut commands: Commands,
     menu: Option<Res<State<GameMenu>>>,
     first_person: Res<FirstPerson>,
+    at_computer: Res<AtComputer>,
     player: Query<(Entity, &ContextActivity<PlayerControls>)>,
     spectator: Query<(Entity, &ContextActivity<SpectatorControls>)>,
 ) {
     let playing = menu.is_some_and(|m| *m.get() == GameMenu::Closed);
+    let walking = playing && first_person.active && !at_computer.typing();
 
     for (e, activity) in &player {
-        if **activity != (playing && first_person.active) {
-            commands.entity(e).insert(ContextActivity::<PlayerControls>::new(playing && first_person.active));
+        if **activity != walking {
+            commands.entity(e).insert(ContextActivity::<PlayerControls>::new(walking));
         }
     }
 

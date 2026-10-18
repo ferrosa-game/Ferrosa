@@ -4,6 +4,7 @@ mod briefing;
 mod bullets;
 mod camera;
 mod chat;
+mod computer;
 mod controls;
 mod doors;
 mod effects;
@@ -24,6 +25,7 @@ mod network;
 mod paper_doll;
 mod player_menu;
 mod roster;
+mod set_items;
 pub mod round_events;
 mod item_displays;
 mod sky;
@@ -85,7 +87,7 @@ impl Plugin for GamePlugin {
                 briefing::BriefingPlugin
             ),
         ))
-        .add_plugins((eliminator::EliminatorPlugin, admin::AdminPlugin, item_displays::ScreensPlugin, map::MapPlugin))
+        .add_plugins((eliminator::EliminatorPlugin, admin::AdminPlugin, item_displays::ScreensPlugin, map::MapPlugin, set_items::SetItemsPlugin, computer::ComputerPlugin))
         .add_systems(Update, scale_ui.run_if(in_state(Screen::InGame)))
         .add_systems(OnExit(Screen::InGame), |mut scale: ResMut<UiScale>| scale.0 = 1.0);
     }

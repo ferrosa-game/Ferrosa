@@ -12,6 +12,7 @@ use super::{
     GAME_SCREEN, Level,
     briefing::{Row, RowKind, briefing_rows},
     camera::EXPOSURE,
+    computer::AtComputer,
     escape_menu::{GameMenu, MENU_LAYER, OVERLAY_LAYER},
     hud::{Stick, align, anchored, colour, rect, spawn_screen, text},
     items::ItemTypes,
@@ -311,9 +312,9 @@ fn fill_briefing(
     }
 }
 
-fn toggle_maps(keys: Res<ButtonInput<KeyCode>>, menu: Res<State<GameMenu>>, mut next: ResMut<NextState<GameMenu>>, mut minimap: ResMut<MinimapOpen>) {
+fn toggle_maps(keys: Res<ButtonInput<KeyCode>>, menu: Res<State<GameMenu>>, at_computer: Res<AtComputer>, mut next: ResMut<NextState<GameMenu>>, mut minimap: ResMut<MinimapOpen>) {
     match menu.get() {
-        GameMenu::Closed | GameMenu::PlayerMenu => {
+        GameMenu::Closed | GameMenu::PlayerMenu if !at_computer.typing() => {
             if keys.just_pressed(KeyCode::KeyC) {
                 next.set(GameMenu::Map);
             }
