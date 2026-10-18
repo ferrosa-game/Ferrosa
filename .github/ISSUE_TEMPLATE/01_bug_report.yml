@@ -1,0 +1,35 @@
+name: Report a bug
+description: For bug reports when things dont go as expected
+body:
+  - type: input
+    attributes:
+      label: What version did the issue occur in?
+      description: You can find the version in the bottom right of the main menu.
+      placeholder: vX.X.X
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: Description
+      description: |
+        A clear and concise description of what the issue is.
+        If the issue is visual in nature, consider posting a screenshot.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reproduction
+      description: List the steps required to reproduce the issue.
+      placeholder: |
+        1.
+        2.
+        3.
+        ...
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Additional Context
+      description: Add any other additional context about the issue here.
+    validations:
+      required: false

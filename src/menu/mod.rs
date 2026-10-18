@@ -1,9 +1,11 @@
 use bevy::{
+    picking::events::PointerClick,
     prelude::*,
     ui_widgets::Activate,
 };
 
 use crate::{
+    check_for_updates::{CanUpdate, open_url},
     config::Config,
     masterserver::{MasterAuth, auth_status}, menu::character::{character, PlayerLook}, steam::Steam, ui::{self, Shortcut},
 };
@@ -30,6 +32,8 @@ pub const MENU_BACKGROUND: Color = Color::srgb(0.035, 0.063, 0.082);
 
 const MENU_BUTTON: Vec2 = Vec2::new(320.0, 44.0);
 const HEADING: Color = Color::srgb(0.75, 0.75, 0.75);
+const UPDATE: Color = Color::srgb(1.0, 0.2, 0.2);
+const UPDATE_BOTTOM: f32 = 34.0;
 
 #[derive(Component, Clone, Copy, Debug)]
 enum Action {
@@ -49,7 +53,7 @@ impl Plugin for MenuPlugin {
             .add_systems(OnEnter(Screen::Main), main_menu)
             .add_systems(OnEnter(Screen::Character), character)
             .add_systems(OnEnter(Screen::HostGame), |commands: Commands| placeholder(commands, Screen::HostGame, "Start Game"))
-            .add_systems(Update, update_auth_status)
+            .add_systems(Update, (update_auth_status, show_update_notice))
             .add_observer(on_activate);
     }
 }
@@ -118,6 +122,33 @@ fn main_menu(mut commands: Commands) {
         AuthStatusText,
         ChildOf(p),
     ));
+
+    commands
+        .spawn((
+            Node { position_type: PositionType::Absolute, left: px(16), bottom: px(UPDATE_BOTTOM), ..default() },
+            Text::new("Click here to get the newest update!"),
+            TextFont::from_font_size(16.0),
+            TextColor(UPDATE),
+            Visibility::Hidden,
+            UpdateNotice,
+            ChildOf(p),
+        ))
+        .observe(|_: On<PointerClick>, update: Option<Res<CanUpdate>>| {
+            if let Some(update) = update {
+                open_url(&update.url);
+            }
+        });
+}
+
+#[derive(Component)]
+struct UpdateNotice;
+
+fn show_update_notice(update: Option<Res<CanUpdate>>, mut notices: Query<&mut Visibility, With<UpdateNotice>>) {
+    let shown = if update.is_some() { Visibility::Inherited } else { Visibility::Hidden };
+
+    for mut v in &mut notices {
+        v.set_if_neq(shown);
+    }
 }
 
 fn back_button(commands: &mut Commands, parent: Entity) {
@@ -150,7 +181,8 @@ struct AuthStatusText;
 fn update_auth_status(master: Option<Res<MasterAuth>>, steam: Option<Res<Steam>>, mut texts: Query<&mut Text, With<AuthStatusText>>) {
     let Some(steam) = steam else { return };
 
-    let status = auth_status(master.as_deref(), &steam);
+    let auth = auth_status(master.as_deref(), &steam);
+    let status = format!("({}) {auth}", env!("GIT_HASH"));
 
     for mut text in &mut texts {
         if text.0 != status {

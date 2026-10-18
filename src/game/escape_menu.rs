@@ -16,7 +16,6 @@ pub const ROSTER_LAYER: i32 = 4;
 pub const OVERLAY_LAYER: i32 = 5;
 pub const MENU_LAYER: i32 = 6;
 const BACK_BUTTON: Vec2 = Vec2::new(320.0, 44.0);
-const SHADE: Color = Color::srgba(0.0, 0.0, 0.0, 0.5);
 const OPTIONS_SHADE: Color = Color::srgba(0.035, 0.063, 0.082, 0.9);
 
 #[derive(SubStates, Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
@@ -30,6 +29,7 @@ pub enum GameMenu {
     Chat,
     Mute,
     Admin,
+    Map,
 }
 
 #[derive(Component, Clone, Copy)]
@@ -78,7 +78,7 @@ fn spawn_menu(mut commands: Commands, net: Option<Res<NetGame>>) {
                 row_gap: px(8),
                 ..default()
             },
-            BackgroundColor(SHADE),
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.5)),
             GlobalZIndex(MENU_LAYER),
             DespawnOnExit(GameMenu::Open),
         ))

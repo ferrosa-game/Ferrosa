@@ -6,7 +6,7 @@ use ferrosa_protocol::{
 
 use super::{
     Level,
-    escape_menu::{GameMenu, OVERLAY_LAYER},
+    escape_menu::OVERLAY_LAYER,
     hud::{Stick, align, anchored, colour, rect, spawn_screen, text},
     items::ItemTypes,
     netgame::{Mission, NetGame, PROTECTOR, entities::Player},
@@ -18,13 +18,7 @@ use crate::{
 };
 
 const WHITE: [f32; 4] = [1.0; 4];
-const BLACK: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
 const WANTED: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
-const PANE: [f32; 4] = [0.75, 0.75, 0.75, 1.0];
-const PANE_AT: Vec2 = Vec2::new(512.0, 32.0);
-const PANE_SIZE: Vec2 = Vec2::new(512.0, 512.0);
-const PANE_TEXT: f32 = 520.0;
-const LINE: f32 = 16.0;
 const TICKS_PER_HOUR: u32 = 216000;
 const TICKS_PER_MINUTE: u32 = 3600;
 const LUNCH: std::ops::RangeInclusive<u32> = 0x278d00..=0x278d00 + 0x34bbf;
@@ -78,20 +72,31 @@ struct WorldClock;
 #[derive(Component)]
 struct CentreNotice;
 
-#[derive(Component)]
-struct Pane;
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum RowKind {
+    Title,
+    Heading,
+    Body,
+    Blank,
+}
 
-#[derive(Resource, Default)]
-struct PaneOpen(bool);
+#[derive(Clone, PartialEq, Debug)]
+pub struct Row {
+    pub kind: RowKind,
+    pub text: String,
+    pub colour: [f32; 4],
+}
+
+fn row(kind: RowKind, text: impl Into<String>) -> Row {
+    Row { kind, text: text.into(), colour: WHITE }
+}
 
 pub struct BriefingPlugin;
 
 impl Plugin for BriefingPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<PaneOpen>()
-            .add_systems(OnEnter(Screen::InGame), spawn_layers)
-            .add_systems(OnExit(Screen::InGame), |mut open: ResMut<PaneOpen>| open.0 = false)
-            .add_systems(Update, (toggle_pane, show_world_hud, show_notice, show_pane).run_if(in_state(Screen::InGame)).run_if(resource_exists::<NetGame>));
+        app.add_systems(OnEnter(Screen::InGame), spawn_layers)
+            .add_systems(Update, (show_world_hud, show_notice).run_if(in_state(Screen::InGame)).run_if(resource_exists::<NetGame>));
     }
 }
 
@@ -110,13 +115,6 @@ fn spawn_layers(mut commands: Commands) {
     layer(&mut commands, &|e| { e.insert(WorldCorner); }, Stick::TopLeft, None);
     layer(&mut commands, &|e| { e.insert(WorldClock); }, Stick::TopRight, None);
     layer(&mut commands, &|e| { e.insert(CentreNotice); }, Stick::Centre, Some(OVERLAY_LAYER));
-    layer(&mut commands, &|e| { e.insert(Pane); }, Stick::Centre, Some(OVERLAY_LAYER));
-}
-
-fn toggle_pane(keys: Res<ButtonInput<KeyCode>>, menu: Res<State<GameMenu>>, mut open: ResMut<PaneOpen>) {
-    if keys.just_pressed(KeyCode::KeyC) && matches!(menu.get(), GameMenu::Closed | GameMenu::PlayerMenu) {
-        open.0 = !open.0;
-    }
 }
 
 fn world(net: &NetGame) -> bool {
@@ -193,19 +191,20 @@ fn mission_team_name(team: i32) -> String {
     usize::try_from(team).ok().and_then(|t| Team::CORPORATION_NAMES.get(t)).map_or_else(|| format!("team {}", team + 1), |n| n.to_string())
 }
 
-fn info_card(p: &Player, lines: &mut Vec<Line>) {
-    let at = |y: f32| Vec2::new(PANE_TEXT, y);
+fn info_card(p: &Player, rows: &mut Vec<Row>) {
+    rows.push(row(RowKind::Title, p.name.clone()));
+    rows.push(row(RowKind::Body, phone_number(p.phone_number as u32)));
+    rows.push(row(RowKind::Body, format!("Corporate rating: {}", p.corporate_rating)));
+    rows.push(row(RowKind::Blank, ""));
 
-    lines.push(line(p.name.clone(), at(48.0), align::TOP_LEFT, LINE, BLACK));
-    lines.push(line(phone_number(p.phone_number as u32), at(64.0), align::TOP_LEFT, LINE, BLACK));
-    lines.push(line(format!("Corporate rating: {}", p.corporate_rating), at(80.0), align::TOP_LEFT, LINE, BLACK));
-
-    if let Some(name) = corporation_name(p.team) {
-        lines.push(line(name, at(112.0), align::TOP_LEFT, LINE, BLACK));
+    match corporation_name(p.team) {
+        Some(name) => {
+            rows.push(row(RowKind::Heading, name));
+            rows.push(row(RowKind::Body, format!("${}", p.team_money)));
+            rows.push(row(RowKind::Body, format!("Budget: ${}", p.budget)));
+        }
+        None => rows.push(row(RowKind::Heading, "Freelancer")),
     }
-
-    lines.push(line(format!("${}", p.team_money), at(128.0), align::TOP_LEFT, LINE, BLACK));
-    lines.push(line(format!("Budget: ${}", p.budget), Vec2::new(680.0, 128.0), align::TOP_LEFT, LINE, BLACK));
 }
 
 fn mission_lines(m: &Mission, disk: &str, place: &dyn Fn(i32) -> Option<(String, String)>) -> Vec<String> {
@@ -308,68 +307,55 @@ fn mission_lines(m: &Mission, disk: &str, place: &dyn Fn(i32) -> Option<(String,
     out
 }
 
-fn show_pane(
-    mut commands: Commands,
-    net: Res<NetGame>,
-    open: Res<PaneOpen>,
-    fonts: Res<GameFonts>,
-    level: Option<Res<Level>>,
-    types: Option<Res<ItemTypes>>,
-    mut pane: Single<(Entity, &mut TextLayer), With<Pane>>,
-) {
-    let mode = net.sync.game_type;
-    let shown = open.0 && (mode != GameMode::Eliminator || net.game_state == GameState::InGame);
-    let lines = net.me().filter(|_| shown).map(|p| {
-        let mut lines = Vec::new();
-        let mut y = 80.0;
+pub fn briefing_rows(net: &NetGame, level: Option<&Level>, types: Option<&ItemTypes>) -> Vec<Row> {
+    let Some(p) = net.me() else { return Vec::new() };
+    let mut rows = Vec::new();
 
-        if mode == GameMode::Eliminator
-            && let Some(&(role, _)) = usize::try_from(net.role).ok().and_then(|k| ROLES.get(k))
-        {
-            lines.push(line(role, Vec2::new(PANE_TEXT, 80.0), align::TOP_LEFT, LINE, BLACK));
-            y = 112.0;
+    match net.sync.game_type {
+        GameMode::Eliminator => match usize::try_from(net.role).ok().and_then(|k| ROLES.get(k)) {
+            Some(&(role, [r, g, b])) => {
+                rows.push(Row { kind: RowKind::Title, text: role.to_string(), colour: [r, g, b, 1.0] });
 
-            if net.role == PROTECTOR {
-                lines.push(line(format!("The Savior is {}", savior(&net)), Vec2::new(PANE_TEXT, 112.0), align::TOP_LEFT, LINE, BLACK));
-            }
-        }
-
-        if mode == GameMode::World {
-            info_card(p, &mut lines);
-        }
-
-        if mode == GameMode::Round
-            && let Some(team) = ROUND_CORPORATIONS.iter().position(|&t| t == p.team)
-        {
-            lines.push(line(Team::CORPORATION_NAMES[team], Vec2::new(PANE_TEXT, y + 16.0), align::TOP_LEFT, LINE, BLACK));
-            lines.push(line("Missions:", Vec2::new(PANE_TEXT, y + 48.0), align::TOP_LEFT, LINE, BLACK));
-
-            let disk = |m: &Mission| usize::try_from(m.disk_type).ok().and_then(|k| types.as_ref()?.0.get(k)).map_or(String::new(), |t| t.name.clone());
-            let place = |location: i32| {
-                let map = &level.as_ref()?.map;
-                let (a, b) = map.level.buildings.get(usize::try_from(location).ok()?)?.streets;
-                let street = |s: i32| map.streets.streets.get(usize::try_from(s).ok()?).map(|s| s.name.to_string());
-                Some((street(a)?, street(b)?))
-            };
-            let mut at = y + 80.0;
-            let missions: Vec<&Mission> = net.missions.get(team).map(|m| m.iter().filter(|m| m.active).collect()).unwrap_or_default();
-
-            for m in &missions {
-                for text in mission_lines(m, &disk(m), &place) {
-                    lines.push(line(text, Vec2::new(PANE_TEXT, at), align::TOP_LEFT, LINE, BLACK));
-                    at += LINE;
+                if net.role == PROTECTOR {
+                    rows.push(row(RowKind::Body, format!("The Savior is {}", savior(net))));
                 }
             }
+            None => rows.push(row(RowKind::Title, "Waiting for the round")),
+        },
+        GameMode::World => info_card(p, &mut rows),
+        _ => match ROUND_CORPORATIONS.iter().position(|&t| t == p.team) {
+            Some(team) => {
+                rows.push(row(RowKind::Title, Team::CORPORATION_NAMES[team]));
+                rows.push(row(RowKind::Blank, ""));
 
-            if missions.is_empty() {
-                let lunch = LUNCH.contains(&net.sun_time);
-                lines.push(line(if lunch { "Lunch break" } else { "No current missions" }, Vec2::new(PANE_TEXT, at), align::TOP_LEFT, LINE, BLACK));
+                let disk = |m: &Mission| usize::try_from(m.disk_type).ok().and_then(|k| types?.0.get(k)).map_or(String::new(), |t| t.name.clone());
+                let place = |location: i32| {
+                    let map = &level?.map;
+                    let (a, b) = map.level.buildings.get(usize::try_from(location).ok()?)?.streets;
+                    let street = |s: i32| map.streets.streets.get(usize::try_from(s).ok()?).map(|s| s.name.to_string());
+                    Some((street(a)?, street(b)?))
+                };
+                let missions: Vec<&Mission> = net.missions.get(team).map(|m| m.iter().filter(|m| m.active).collect()).unwrap_or_default();
+
+                for m in &missions {
+                    let mut lines = mission_lines(m, &disk(m), &place).into_iter();
+
+                    if let Some(heading) = lines.next() {
+                        rows.push(row(RowKind::Heading, heading.trim_end_matches(':')));
+                    }
+
+                    rows.extend(lines.map(|l| if l.is_empty() { row(RowKind::Blank, "") } else { row(RowKind::Body, l) }));
+                    rows.push(row(RowKind::Blank, ""));
+                }
+
+                if missions.is_empty() {
+                    let lunch = LUNCH.contains(&net.sun_time);
+                    rows.push(row(RowKind::Body, if lunch { "Lunch break" } else { "No current missions" }));
+                }
             }
-        }
+            None => rows.push(row(RowKind::Title, "Spectating")),
+        },
+    }
 
-        lines
-    });
-
-    let (e, layer) = &mut *pane;
-    redraw(&mut commands, *e, layer, &fonts.rockwell, lines, Some((PANE_AT, PANE_SIZE, PANE)));
+    rows
 }

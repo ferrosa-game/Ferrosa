@@ -183,37 +183,36 @@ fn enter_number(entered: On<ValueChange<String>>, mut inputs: Query<(&NumberRang
         return;
     }
 
-    let Ok((range, mut editable, mut last)) = inputs.get_mut(entered.source) else { return };
+    let Ok((range, mut editable, mut last)) = inputs.get_mut(entered.source) else { 
+        return; 
+    };
 
-    let (shown, report) = match *range {
+    let shown = match *range {
         NumberRange::Int(min, max) => {
-            let v = scan_int(&entered.value).unwrap_or(last.0 as i32).clamp(min, max);
+            let v = scan_int(&entered.value)
+                .unwrap_or(last.0 as i32)
+                .clamp(min, max);
+            
             last.0 = v as f64;
-            (v.to_string(), Ok(v))
+            commands.trigger(ValueChange { source: entered.source, value: v, is_final: true });
+            
+            v.to_string()
         }
         NumberRange::Float(min, max) => {
-            let mut v = entered.value.trim().parse::<f32>().unwrap_or(last.0 as f32);
-
-            if !(min <= v) {
-                v = min;
-            }
-
-            if !(v <= max) {
-                v = max;
-            }
+            let v = entered.value
+                .trim()
+                .parse::<f32>()
+                .unwrap_or(last.0 as f32)
+                .clamp(min, max);
 
             last.0 = v as f64;
-
-            (format!("{v:.3}"), Err(v))
+            commands.trigger(ValueChange { source: entered.source, value: v, is_final: true });
+            
+            format!("{v:.3}")
         }
     };
 
     editable.editor_mut().set_text(&shown);
-
-    match report {
-        Ok(v) => commands.trigger(ValueChange { source: entered.source, value: v, is_final: true }),
-        Err(v) => commands.trigger(ValueChange { source: entered.source, value: v, is_final: true }),
-    }
 }
 
 #[derive(Component, Default)]

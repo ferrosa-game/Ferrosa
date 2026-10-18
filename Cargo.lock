@@ -2889,8 +2889,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "ferrosa"
+version = "0.1.0"
+dependencies = [
+ "ab_glyph",
+ "bevy",
+ "bevy_enhanced_input",
+ "binrw",
+ "cpal 0.18.2",
+ "discord-sdk",
+ "ferrosa-map",
+ "ferrosa-protocol",
+ "ferrosa-world",
+ "futures-lite",
+ "rand",
+ "reqwest",
+ "rodio 0.23.0",
+ "rusty-opus",
+ "serde_json",
+ "steamworks",
+ "sysinfo",
+ "tokio",
+ "winit",
+ "winresource",
+]
+
+[[package]]
 name = "ferrosa-map"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "binrw",
  "glam",
@@ -2902,7 +2928,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-physics"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "glam",
  "rayon",
@@ -2910,7 +2936,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-protocol"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "bitflags 2.13.2",
  "glam",
@@ -2920,7 +2946,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-world"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ferrosa-map",
  "ferrosa-physics",
@@ -3049,6 +3075,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1f9e3d69d39e4862ffed03ed071a76f9a13ba1d9109d355b0f0aa6b15e393c4"
 dependencies = [
  "futures-core",
+ "futures-sink",
 ]
 
 [[package]]
@@ -3106,8 +3133,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d50a92467f8ba5dd6e3ee5d4bd04d73ab2e4e1c44474a0674821dfce14b79bc"
 dependencies = [
  "futures-core",
+ "futures-io",
  "futures-macro",
+ "futures-sink",
  "futures-task",
+ "memchr",
  "pin-project-lite",
  "slab",
 ]
@@ -4273,29 +4303,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "new_client"
-version = "0.1.0"
-dependencies = [
- "ab_glyph",
- "bevy",
- "bevy_enhanced_input",
- "binrw",
- "cpal 0.18.2",
- "discord-sdk",
- "ferrosa-map",
- "ferrosa-protocol",
- "ferrosa-world",
- "rand",
- "rodio 0.23.0",
- "rusty-opus",
- "steamworks",
- "sysinfo",
- "tokio",
- "winit",
- "winresource",
-]
-
-[[package]]
 name = "nix"
 version = "0.31.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5346,7 +5353,9 @@ dependencies = [
  "base64",
  "bytes",
  "encoding_rs",
+ "futures-channel",
  "futures-core",
+ "futures-util",
  "h2",
  "http",
  "http-body",
@@ -5363,6 +5372,8 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
+ "serde",
+ "serde_json",
  "sync_wrapper",
  "tokio",
  "tokio-rustls",
@@ -5502,9 +5513,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-native-certs"
-version = "0.8.4"
+version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dab5152771c58876a2146916e53e35057e1a4dfa2b9df0f0305b07f611fdea4d"
+checksum = "4a073f5dc7469f984c52ad2752b63b0807745133b6de880b7b64c1ac4c48aec4"
 dependencies = [
  "openssl-probe",
  "rustls-pki-types",
@@ -5593,9 +5604,9 @@ dependencies = [
 
 [[package]]
 name = "schannel"
-version = "0.1.29"
+version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91c1b7e4904c873ef0710c1f407dde2e6287de2bebc1bbbf7d430bb7cbffd939"
+checksum = "9cb23c424d8ee841bb4d813677ca237e2a610067d594fec130f87d6093495ab5"
 dependencies = [
  "windows-sys 0.61.2",
 ]

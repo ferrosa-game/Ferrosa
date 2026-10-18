@@ -6,6 +6,9 @@
 use bevy::{ecs::system::NonSendMarker, window::PrimaryWindow};
 use bevy::prelude::*;
 
+use crate::check_for_updates::{handle_update_task, spawn_update_check};
+
+mod check_for_updates;
 mod audio;
 mod config;
 mod fonts;
@@ -36,10 +39,11 @@ fn main() {
             game::GamePlugin,
             rich_presence::RichPresencePlugin,
         ))
+        .add_systems(Startup, spawn_update_check)
         .add_systems(Startup, |mut commands: Commands| {
             commands.spawn((Camera2d, IsDefaultUiCamera));
         })
-        .add_systems(Update, set_window_icon)
+        .add_systems(Update, (set_window_icon, handle_update_task))
         .run();
 }
 

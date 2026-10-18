@@ -1,4 +1,16 @@
 use std::path::{Path, PathBuf};
+use std::process::Command;
+
+fn get_git_hash() {
+    let git_hash = Command::new("git")
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_else(|_| "unknown".to_string());
+
+    println!("cargo::rustc-env=GIT_HASH={}", git_hash);
+    println!("cargo::rerun-if-changed=.git/HEAD");
+}
 
 fn steam_api_dll() -> Option<PathBuf> {
     let home = std::env::var_os("CARGO_HOME").map(PathBuf::from).or_else(|| std::env::var_os("USERPROFILE").map(|h| Path::new(&h).join(".cargo")))?;
@@ -30,6 +42,7 @@ fn main() {
         }
 
         set_windows_icon();
+        get_git_hash();
     }
 
     println!("cargo:rerun-if-changed=build.rs");

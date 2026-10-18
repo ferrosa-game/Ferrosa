@@ -18,6 +18,7 @@ mod items;
 mod mute;
 mod level_render;
 mod loading;
+mod map;
 pub mod netgame;
 mod network;
 mod paper_doll;
@@ -84,7 +85,7 @@ impl Plugin for GamePlugin {
                 briefing::BriefingPlugin
             ),
         ))
-        .add_plugins((eliminator::EliminatorPlugin, admin::AdminPlugin, item_displays::ScreensPlugin))
+        .add_plugins((eliminator::EliminatorPlugin, admin::AdminPlugin, item_displays::ScreensPlugin, map::MapPlugin))
         .add_systems(Update, scale_ui.run_if(in_state(Screen::InGame)))
         .add_systems(OnExit(Screen::InGame), |mut scale: ResMut<UiScale>| scale.0 = 1.0);
     }
