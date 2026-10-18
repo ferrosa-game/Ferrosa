@@ -210,6 +210,7 @@ fn zoom_preview(mut scroll: On<PointerScroll>, mut view: ResMut<PreviewView>) {
     view.distance = (view.distance * ZOOM_PER_NOTCH.powf(notches)).clamp(NEAREST, FARTHEST);
 }
 
+#[allow(clippy::type_complexity)]
 fn apply_view(
     view: Res<PreviewView>,
     mut turntables: Query<&mut Transform, (With<PreviewTurntable>, Without<PreviewCamera>, Without<PreviewHuman>)>,

@@ -163,9 +163,9 @@ pub fn spawn_options(commands: &mut Commands, config: &Config, devices: &AudioDe
     });
 
     let list = Vec2::new(ITEM.x, 256.0);
-    let output = ui::spinner::spinner(&mut commands, right, "Audio Output", &devices.output, devices.chosen_output, ITEM, list);
+    let output = ui::dropdown::dropdown(&mut commands, right, "Audio Output", &devices.output, devices.chosen_output, ITEM, list);
     commands.entity(output).observe(|v: On<ValueChange<usize>>, mut devices: ResMut<AudioDevices>| devices.chosen_output = v.value);
-    let input = ui::spinner::spinner(&mut commands, right, "Audio Input", &devices.input, devices.chosen_input, ITEM, list);
+    let input = ui::dropdown::dropdown(&mut commands, right, "Audio Input", &devices.input, devices.chosen_input, ITEM, list);
     commands.entity(input).observe(|v: On<ValueChange<usize>>, mut devices: ResMut<AudioDevices>| devices.chosen_input = v.value);
 
     heading(&mut commands, right, "Voice");

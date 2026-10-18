@@ -13,13 +13,13 @@ use bevy::{
     },
 };
 
-use crate::ui::{checkbox::checkbox_ticks, slider::{slider_labels, slider_thumbs}, spinner::{Spinner, close_spinners}, text::{MaskOf, password_masks}, window::WindowOrder};
+use crate::ui::{checkbox::checkbox_ticks, slider::{slider_labels, slider_thumbs}, dropdown::{Dropdown, close_dropdowns, despawn_closed}, text::{MaskOf, password_masks}, window::WindowOrder};
 
 pub mod radio;
 pub mod slider;
 pub mod text;
 pub mod checkbox;
-pub mod spinner;
+pub mod dropdown;
 pub mod window;
 
 pub const TEXT_SIZE: f32 = 16.0;
@@ -40,8 +40,8 @@ const CHECK_FRAME: Color = Color::srgb(0.875, 0.875, 0.875);
 const LIST: Color = Color::srgba(0.125, 0.125, 0.125, 0.85);
 const ROW_CHOSEN: Color = Color::srgba(0.75, 0.75, 0.75, 0.5);
 const ROW_HOVERED: Color = Color::srgba(0.625, 0.625, 0.625, 0.5);
-const SPINNER: Color = Color::srgba(0.5, 0.5, 0.5, 0.5);
-const SPINNER_HOVERED: Color = Color::srgba(0.75, 0.75, 0.75, 0.5);
+const DROPDOWN: Color = Color::srgba(0.5, 0.5, 0.5, 0.5);
+const DROPDOWN_HOVERED: Color = Color::srgba(0.75, 0.75, 0.75, 0.5);
 const POPUP: Color = Color::srgb(0.08, 0.08, 0.08);
 const POPUP_Z: i32 = 1 << 20;
 
@@ -50,7 +50,8 @@ pub struct UiPlugin;
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<WindowOrder>()
-            .add_systems(Update, (shortcuts, button_colours, checkbox_ticks, field_colours, slider_thumbs, slider_labels, row_colours, password_masks, close_spinners));
+            .add_systems(Update, (shortcuts, button_colours, checkbox_ticks, field_colours, slider_thumbs, slider_labels, row_colours, password_masks, close_dropdowns))
+            .add_systems(Last, despawn_closed);
     }
 }
 
@@ -229,7 +230,7 @@ pub struct ListRow(pub usize);
 
 pub fn listbox(commands: &mut Commands, parent: Entity, items: &[String], chosen: Option<usize>, size: Vec2, item: Vec2) -> Entity {
     listbox_with(commands, parent, items.len(), chosen, size, item, |commands, row, i| {
-        commands.spawn((text_bundle(&items[i], ITEM_TEXT_SIZE, Color::WHITE), ChildOf(row)));
+        commands.spawn((text_bundle(&items[i], ITEM_TEXT_SIZE, Color::WHITE), TextLayout::no_wrap(), ChildOf(row)));
     })
 }
 
@@ -257,7 +258,7 @@ pub fn listbox_with(commands: &mut Commands, parent: Entity, count: usize, chose
     for i in 0..count {
         let row = commands
             .spawn((
-                Node { width: px(item.x), height: px(item.y), padding: UiRect::left(px(4)), align_items: AlignItems::Center, ..default() },
+                Node { width: px(item.x), height: px(item.y), padding: UiRect::left(px(4)), align_items: AlignItems::Center, overflow: Overflow::clip(), ..default() },
                 BackgroundColor(Color::NONE),
                 ListItem,
                 ListRow(i),
@@ -319,13 +320,13 @@ fn button_colours(mut buttons: Query<(&Hovered, Has<Pressed>, Has<Checked>, Has<
     }
 }
 
-fn field_colours(mut fields: Query<(&Hovered, &mut BackgroundColor, Has<Field>, Has<Spinner>, Has<Slider>), Or<(With<Field>, With<Spinner>, With<Slider>)>>) {
-    for (hovered, mut colour, field, spinner, _) in &mut fields {
-        let want = match (field, spinner, hovered.get()) {
+fn field_colours(mut fields: Query<(&Hovered, &mut BackgroundColor, Has<Field>, Has<Dropdown>, Has<Slider>), Or<(With<Field>, With<Dropdown>, With<Slider>)>>) {
+    for (hovered, mut colour, field, dropdown, _) in &mut fields {
+        let want = match (field, dropdown, hovered.get()) {
             (true, _, true) => FIELD_HOVERED,
             (true, _, false) => FIELD,
-            (_, true, true) => SPINNER_HOVERED,
-            (_, true, false) => SPINNER,
+            (_, true, true) => DROPDOWN_HOVERED,
+            (_, true, false) => DROPDOWN,
             (_, _, true) => TRACK_HOVERED,
             (_, _, false) => TRACK,
         };

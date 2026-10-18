@@ -196,7 +196,7 @@ fn browse(time: Res<Time<Real>>, master: Option<Res<MasterAuth>>, mut socket: Re
 
         if list.total > 0 {
             if list.total > list.ping_index {
-                let ping = InfoRequest { version: 38 as u8, timestamp: now };
+                let ping = InfoRequest { version: 38_u8, timestamp: now };
 
                 socket.send(&frame_packet(ping), list.addresses[list.ping_index]);
             }

@@ -52,7 +52,7 @@ impl Plugin for DevicesPlugin {
 fn device_name(d: &cpal::Device) -> Option<String> {
     let description = d.description().ok()?;
 
-    Some(description.extended().first().map_or_else(|| description.name().to_string(), Clone::clone))
+    Some(description.extended().next().map_or_else(|| description.name().to_string(), str::to_string))
 }
 
 fn names(devices: Option<impl Iterator<Item = cpal::Device>>) -> Vec<String> {
@@ -96,12 +96,12 @@ fn open_microphone(name: &str, samples: MicSamples) -> Option<cpal::Stream> {
     let config = device.default_input_config().inspect_err(|e| warn!("audio input {name} has no config: {e}")).ok()?;
     let (channels, rate, format) = (config.channels() as usize, config.sample_rate(), config.sample_format());
     let mut resampler = Resampler { step: MIC_RATE as f64 / rate as f64, phase: 0.0, samples };
-    let error = |e: cpal::StreamError| warn!("microphone: {e}");
+    let error = |e: cpal::Error| warn!("microphone: {e}");
 
     let stream = match format {
-        SampleFormat::F32 => device.build_input_stream(&config.into(), move |data: &[f32], _: &_| resampler.push(data, channels, |s| s), error, None),
-        SampleFormat::I16 => device.build_input_stream(&config.into(), move |data: &[i16], _: &_| resampler.push(data, channels, |s| s as f32 / 32768.0), error, None),
-        SampleFormat::U16 => device.build_input_stream(&config.into(), move |data: &[u16], _: &_| resampler.push(data, channels, |s| (s as f32 - 32768.0) / 32768.0), error, None),
+        SampleFormat::F32 => device.build_input_stream(config.into(), move |data: &[f32], _: &_| resampler.push(data, channels, |s| s), error, None),
+        SampleFormat::I16 => device.build_input_stream(config.into(), move |data: &[i16], _: &_| resampler.push(data, channels, |s| s as f32 / 32768.0), error, None),
+        SampleFormat::U16 => device.build_input_stream(config.into(), move |data: &[u16], _: &_| resampler.push(data, channels, |s| (s as f32 - 32768.0) / 32768.0), error, None),
         other => {
             warn!("audio input {name} gives {other:?} samples");
             return None;

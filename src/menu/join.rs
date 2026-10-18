@@ -168,6 +168,7 @@ fn join_server(
                 password: join.password.clone(),
                 phone_number: master.phone,
                 protocol_version: 71,
+                is_ferrosa: true
             };
 
             socket.send(&frame_packet(p), target.addr);

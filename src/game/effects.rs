@@ -49,6 +49,8 @@ const METAL: i32 = 2;
 const GRAZE: i32 = 3;
 const CASE_MODEL: &str = "models/items/case.glb";
 const CHIP_MODEL: &str = "models/items/chip.glb";
+const CASE_METALLIC: f32 = 0.5;
+const CASE_ROUGHNESS: f32 = 0.125;
 const SMOKE_COLOUR: [f32; 3] = [1.0, 1.0, 0.75];
 const CHIP_COLOUR: Color = Color::srgb(0.3, 0.3, 0.3);
 const BLOOD_SHADE: Color = Color::srgb(0.25, 0.0, 0.0);
@@ -150,7 +152,8 @@ fn empty_mesh() -> Mesh {
 
 fn spawn_effect_assets(mut commands: Commands, assets: Res<AssetServer>, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, mut images: ResMut<Assets<Image>>) {
     let primitive = |path: &str| assets.load(GltfAssetLabel::Primitive { mesh: 0, primitive: 0 }.from_asset(path.to_string()));
-    let case_material = assets.load(GltfAssetLabel::Material { index: 0, is_scale_inverted: false }.from_asset(CASE_MODEL));
+    let case_texture = assets.load(GltfAssetLabel::Texture(0).from_asset(CASE_MODEL));
+    let case_material = materials.add(StandardMaterial { base_color_texture: Some(case_texture), metallic: CASE_METALLIC, perceptual_roughness: CASE_ROUGHNESS, ..default() });
     let chip_material = materials.add(StandardMaterial { base_color: CHIP_COLOUR, perceptual_roughness: 0.9, ..default() });
 
     let mut spot = textures::particle().into_image();
