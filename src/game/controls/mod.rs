@@ -237,7 +237,6 @@ impl InputState {
 pub struct Settings {
     invert: bool,
     manual_hands: bool,
-    pitch_scale: f32,
     paused: bool,
 }
 
@@ -494,7 +493,6 @@ fn inventory_input(net: &mut NetGame, me: usize, human: i32, input: &mut InputSt
     }
 }
 
-// TODO: C and M's map views.
 fn read_input(
     mut net: ResMut<NetGame>,
     mut state: ResMut<InputState>,
@@ -507,10 +505,12 @@ fn read_input(
 
     input.next_tick();
 
+    let sensitivity = config.sensitivity();
+    (input.dx, input.dy) = (input.dx * sensitivity, input.dy * sensitivity);
+
     let settings = Settings {
         invert: config.invert_mouse != 0,
         manual_hands: config.manual_hands != 0,
-        pitch_scale: config.mouse_scale.1,
         paused: menu.is_some_and(|m| *m.get() != GameMenu::Closed),
     };
 

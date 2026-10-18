@@ -21,7 +21,6 @@ pub enum Screen {
     Main,
     ServerList,
     Options,
-    HostGame,
     Character,
     Connecting,
     Loading,
@@ -37,7 +36,6 @@ const UPDATE_BOTTOM: f32 = 34.0;
 
 #[derive(Component, Clone, Copy, Debug)]
 enum Action {
-    Practice,
     Goto(Screen),
     Exit,
 }
@@ -52,7 +50,6 @@ impl Plugin for MenuPlugin {
             .add_plugins((character::CharacterPreviewPlugin, servers::ServerBrowserPlugin, options::OptionsPlugin, join::JoinPlugin))
             .add_systems(OnEnter(Screen::Main), main_menu)
             .add_systems(OnEnter(Screen::Character), character)
-            .add_systems(OnEnter(Screen::HostGame), |commands: Commands| placeholder(commands, Screen::HostGame, "Start Game"))
             .add_systems(Update, (update_auth_status, show_update_notice))
             .add_observer(on_activate);
     }
@@ -102,8 +99,6 @@ fn main_menu(mut commands: Commands) {
     gap(&mut commands, p, 32.0);
 
     let buttons = [
-        ("Practice", Action::Practice, Some(KeyCode::KeyD)),
-        ("Start Game", Action::Goto(Screen::HostGame), Some(KeyCode::KeyS)),
         ("Join Game", Action::Goto(Screen::ServerList), Some(KeyCode::KeyJ)),
         ("Character", Action::Goto(Screen::Character), Some(KeyCode::KeyC)),
         ("Options", Action::Goto(Screen::Options), Some(KeyCode::KeyO)),
@@ -157,17 +152,9 @@ fn back_button(commands: &mut Commands, parent: Entity) {
     button(commands, parent, "Back", Action::Goto(Screen::Main), Some(KeyCode::Escape));
 }
 
-fn placeholder(mut commands: Commands, screen: Screen, title: &str) {
-    let p = page(&mut commands, screen);
-    text(&mut commands, p, title, 32.0, Color::WHITE);
-    back_button(&mut commands, p);
-}
-
 fn on_activate(activate: On<Activate>, actions: Query<&Action>, mut next: ResMut<NextState<Screen>>, mut commands: Commands) {
     let Ok(&action) = actions.get(activate.entity) else { return };
     match action {
-        // TODO: Practice starts a local game, which needs a server alongside the client.
-        Action::Practice => {}
         Action::Goto(screen) => next.set(screen),
         Action::Exit => {
             commands.write_message(AppExit::Success);

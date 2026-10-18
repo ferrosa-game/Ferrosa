@@ -6,37 +6,21 @@ use std::{
 use bevy::prelude::*;
 use rand::RngExt;
 
+pub const SENSITIVITY: (i32, i32) = (10, 400);
+
 #[derive(Resource, Clone, Debug)]
 pub struct Config {
-    pub screen_width: i32,
-    pub screen_height: i32,
-    pub color_depth: i32,
-    pub depth_bits: i32,
-    pub stencil_bits: i32,
     pub fullscreen: i32,
-    pub joystick: i32,
     pub sound: i32,
     pub sound_volume: i32,
-    pub music_volume: i32,
-    pub port: i32,
-    pub server_max_bytes_per_second: i32,
     pub name: String,
-    pub server_name: String,
-    pub admin_password: String,
-    pub server_password: String,
-    pub game_type: i32,
     pub invert_mouse: i32,
-    pub max_players: i32,
-    pub round_time: i32,
-    pub set_cpu_affinity: i32,
-    pub voice_chat: i32,
+    pub mouse_sensitivity: i32,
     pub voice_hold_to_talk: i32,
     pub voice_key: i32,
     pub voice_mb: i32,
     pub voice_min: i32,
     pub voice_boost: i32,
-    pub help: i32,
-    pub occlusion: i32,
     pub vertical_sync: i32,
     pub player_gender: i32,
     pub player_head: i32,
@@ -45,48 +29,25 @@ pub struct Config {
     pub player_hair_style: i32,
     pub player_eye_color: i32,
     pub manual_hands: i32,
-    pub float_depth_buffer: i32,
-    pub frame_smoothing: i32,
-    pub sprite_models: i32,
 
-    pub mouse_sensitivity: i32,
     pub voice_gain: f32,
-    pub mouse_scale: (f32, f32),
 }
 
 impl Config {
     pub fn defaults() -> Self {
         let mut rng = rand::rng();
         Self {
-            screen_width: 1024,
-            screen_height: 640,
-            color_depth: 32,
-            depth_bits: 24,
-            stencil_bits: 8,
             fullscreen: 0,
-            joystick: 1,
             sound: 1,
             sound_volume: 80,
-            music_volume: 80,
-            port: 27584,
-            server_max_bytes_per_second: 500000,
             name: format!("Agent {}", rng.random::<u32>() & 0x7fff_ffff & 0x1ff),
-            server_name: "Ferrosa Server".into(),
-            admin_password: format!("{}", rng.random::<u32>() & 0x7fff_ffff),
-            server_password: String::new(),
-            game_type: 3,
             invert_mouse: 0,
-            max_players: 16,
-            round_time: 10,
-            set_cpu_affinity: 1,
-            voice_chat: 1,
+            mouse_sensitivity: 100,
             voice_hold_to_talk: 1,
             voice_key: 25,
             voice_mb: 0,
             voice_min: 1024,
             voice_boost: 100,
-            help: 1,
-            occlusion: 1,
             vertical_sync: 1,
             player_gender: rng.random_range(0..2),
             player_head: rng.random_range(0..5),
@@ -95,12 +56,7 @@ impl Config {
             player_hair_style: rng.random_range(0..9),
             player_eye_color: rng.random_range(0..8),
             manual_hands: 0,
-            float_depth_buffer: 1,
-            frame_smoothing: 1,
-            sprite_models: 1,
-            mouse_sensitivity: 100,
             voice_gain: 1.0,
-            mouse_scale: (0.0, 0.0),
         }
     }
 
@@ -109,7 +65,6 @@ impl Config {
         let file = std::fs::read(path).unwrap_or_default();
 
         c.visit(&mut Reader { file: &file });
-        c.voice_chat = 1;
         c.derive();
 
         c
@@ -121,42 +76,26 @@ impl Config {
         std::fs::write(path, w.out)
     }
 
+    pub fn sensitivity(&self) -> f32 {
+        self.mouse_sensitivity.clamp(SENSITIVITY.0, SENSITIVITY.1) as f32 / 100.0
+    }
+
     fn derive(&mut self) {
         self.voice_gain = (self.voice_boost as f32 / 100.0).clamp(0.125, 4.0);
-        let scale = self.mouse_sensitivity as f32 / 100.0 * 0.001953125;
-        self.mouse_scale = (scale, if self.invert_mouse != 0 { -scale } else { scale });
     }
 
     fn visit(&mut self, v: &mut impl Visitor) {
-        v.int("screenwidth=", &mut self.screen_width);
-        v.int("screenheight=", &mut self.screen_height);
-        v.int("colordepth=", &mut self.color_depth);
-        v.int("depthbits=", &mut self.depth_bits);
-        v.int("stencilbits=", &mut self.stencil_bits);
         v.int("fullscreen=", &mut self.fullscreen);
-        v.int("joystick=", &mut self.joystick);
         v.int("sound=", &mut self.sound);
         v.int("soundvolume=", &mut self.sound_volume);
-        v.int("musicvolume=", &mut self.music_volume);
-        v.int("port=", &mut self.port);
-        v.int("servermaxbytespersecond=", &mut self.server_max_bytes_per_second);
         v.string("name=", 0x1e, &mut self.name);
-        v.string("servername=", 0x32, &mut self.server_name);
-        v.string("adminpassword=", 0x32, &mut self.admin_password);
-        v.string("serverpassword=", 0x32, &mut self.server_password);
-        v.int("gametype=", &mut self.game_type);
         v.int("invertmouse=", &mut self.invert_mouse);
-        v.int("maxnumofplayers=", &mut self.max_players);
-        v.int("roundtime=", &mut self.round_time);
-        v.int("setcpuaffinity=", &mut self.set_cpu_affinity);
-        v.int("voicechat=", &mut self.voice_chat);
+        v.int("mousesensitivity=", &mut self.mouse_sensitivity);
         v.int("voiceholdtotalk=", &mut self.voice_hold_to_talk);
         v.int("voicekey=", &mut self.voice_key);
         v.int("voicemb=", &mut self.voice_mb);
         v.int("voicemin=", &mut self.voice_min);
         v.int("voiceboost=", &mut self.voice_boost);
-        v.int("help=", &mut self.help);
-        v.int("occlusion=", &mut self.occlusion);
         v.int("verticalsync=", &mut self.vertical_sync);
         v.int("playergender=", &mut self.player_gender);
         v.int("playerhead=", &mut self.player_head);
@@ -165,9 +104,6 @@ impl Config {
         v.int("playerhairstyle=", &mut self.player_hair_style);
         v.int("playereyecolor=", &mut self.player_eye_color);
         v.int("manualhands=", &mut self.manual_hands);
-        v.int("floatdepthbuffer=", &mut self.float_depth_buffer);
-        v.int("framesmoothing=", &mut self.frame_smoothing);
-        v.int("spritemodels=", &mut self.sprite_models);
     }
 }
 

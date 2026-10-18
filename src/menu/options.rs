@@ -7,7 +7,7 @@ use bevy::{
 };
 use crate::{
     audio::AudioDevices,
-    config::{Config, config_path},
+    config::{Config, SENSITIVITY, config_path},
     menu::{Screen, back_button, text},
     ui::{self, Shortcut},
 };
@@ -138,16 +138,17 @@ pub fn spawn_options(commands: &mut Commands, config: &Config, devices: &AudioDe
         }
     });
 
-    flag(&mut commands, left, "Frame Smoothing", config, |c| &mut c.frame_smoothing);
-    flag(&mut commands, left, "Sprite Models", config, |c| &mut c.sprite_models);
-
     heading(&mut commands, left, "Controls");
+    let sensitivity = ui::slider::slider_int(&mut commands, left, "Mouse Sensitivity", config.mouse_sensitivity.clamp(SENSITIVITY.0, SENSITIVITY.1), SENSITIVITY, ITEM.x);
+    commands.entity(sensitivity).observe(|v: On<ValueChange<f32>>, mut config: ResMut<Config>| {
+        let sensitivity = v.value.round() as i32;
+        if config.mouse_sensitivity != sensitivity {
+            config.mouse_sensitivity = sensitivity;
+            save(&config);
+        }
+    });
     flag(&mut commands, left, "Invert Mouse", config, |c| &mut c.invert_mouse);
     flag(&mut commands, left, "Use advanced inventory", config, |c| &mut c.manual_hands);
-
-    heading(&mut commands, left, "Network");
-    number(&mut commands, left, "Port", config.port, (0, 0xffff), |c| &mut c.port);
-    number(&mut commands, left, "Bandwidth", config.server_max_bytes_per_second, (10000, 1_000_000_000), |c| &mut c.server_max_bytes_per_second);
 
     let copy = ui::button(&mut commands, left, "Copy System Info", ITEM);
     commands.entity(copy).observe(copy_system_info);

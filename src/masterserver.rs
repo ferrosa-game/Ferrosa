@@ -137,7 +137,6 @@ fn start(mut commands: Commands, config: Option<Res<Config>>) {
     commands.insert_resource(steam);
     commands.insert_resource(ClientSocket::open());
     commands.insert_resource(ServerInfoFetch(IoTaskPool::get().spawn(async { get_masterserver_info() })));
-    // TODO: the Steam friends list (steam_get_friend_count, steam_get_friend_name).
 }
 
 fn run_steam_callbacks(mut steam: ResMut<Steam>) {

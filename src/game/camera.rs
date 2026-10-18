@@ -159,8 +159,10 @@ fn fly_spectator(
 
     let invert = if config.invert_mouse != 0 { -1.0 } else { 1.0 };
 
-    spectator.yaw += look.x * TURN;
-    spectator.pitch = (spectator.pitch + invert * look.y * TURN).clamp(-FRAC_PI_2, FRAC_PI_2);
+    let turn = TURN * config.sensitivity();
+
+    spectator.yaw += look.x * turn;
+    spectator.pitch = (spectator.pitch + invert * look.y * turn).clamp(-FRAC_PI_2, FRAC_PI_2);
 
     spectator.zoom_target = (spectator.zoom_target - zoom.y).clamp(ZOOM_MIN, ZOOM_MAX);
     spectator.zoom += (spectator.zoom_target - spectator.zoom) * (1.0 - (1.0 - ZOOM_EASE).powf(frames));

@@ -129,7 +129,7 @@ pub fn walk(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, se
 
 fn view_pitch(p: &mut Player, input: &InputState, settings: &Settings) {
     if !input.left {
-        p.aim_pitch[0] += input.dy * settings.pitch_scale;
+        p.aim_pitch[0] += if settings.invert { -1.0 } else { 1.0 } * input.dy * TURN;
     }
 
     p.aim_pitch[0] = p.aim_pitch[0].clamp(-FRAC_PI_2 as f32, FRAC_PI_2 as f32);
