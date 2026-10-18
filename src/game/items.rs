@@ -2,6 +2,7 @@ use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
     gltf::{GltfAssetLabel, GltfMaterialName},
+    light::NotShadowCaster,
     math::Affine2,
     platform::collections::HashMap,
     prelude::*,
@@ -13,6 +14,7 @@ use ferrosa_world::{
 };
 
 use super::{
+    controls::flag,
     human_sync::{NetHuman, bone_at},
     netgame::{entities::Item, NetGame},
     smoothing::{Smoothing, Snapshots},
@@ -27,6 +29,7 @@ const FAN: f32 = 0.031_25;
 const FACE: &str = "skin";
 const FACE_SHIFT: f32 = 0.1875;
 const OTHER_FACE: i32 = 1;
+const REACH: f32 = 1.5;
 
 #[derive(Resource)]
 pub struct ItemTypes(pub Vec<ItemType>);
@@ -60,8 +63,14 @@ struct Bill(usize);
 #[derive(Component)]
 struct FaceSlot(Handle<StandardMaterial>);
 
+#[derive(Component)]
+struct Highlight(Entity);
+
 #[derive(Resource)]
 struct BillTextures(Vec<Handle<Image>>);
+
+#[derive(Resource)]
+struct HighlightMaterial(Handle<StandardMaterial>);
 
 #[derive(Resource, Default)]
 struct ItemMaterials(HashMap<(AssetId<StandardMaterial>, usize), Handle<StandardMaterial>>);
@@ -71,12 +80,17 @@ pub struct ItemsPlugin;
 impl Plugin for ItemsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ItemMaterials>()
-            .add_systems(Startup, |mut commands: Commands, assets: Res<AssetServer>| {
+            .add_systems(Startup, |mut commands: Commands, assets: Res<AssetServer>, mut materials: ResMut<Assets<StandardMaterial>>| {
                 commands.insert_resource(BillTextures(NOTES.iter().map(|n| assets.load(format!("textures/cash_{n}.png"))).collect()));
+                commands.insert_resource(HighlightMaterial(materials.add(StandardMaterial { base_color: Color::srgba(1.0, 1.0, 1.0, 0.5), unlit: true, alpha_mode: AlphaMode::Blend, ..default() })));
             })
             .add_systems(Update, sync_items.in_set(Smoothing::Sync).run_if(resource_exists::<NetGame>))
             .add_systems(Update, (stack_cash, mark_faces, show_faces, print_bills).chain().after(Smoothing::Sync).run_if(in_state(Screen::InGame)))
-            .add_systems(Update, carry_on_back.after(Smoothing::Glide).before(Smoothing::View).run_if(in_state(Screen::InGame)));
+            .add_systems(Update, carry_on_back.after(Smoothing::Glide).before(Smoothing::View).run_if(in_state(Screen::InGame)))
+            .add_systems(
+                Update,
+                (highlight_target, paint_highlight).chain().after(Smoothing::Glide).before(Smoothing::View).run_if(in_state(Screen::InGame)).run_if(resource_exists::<NetGame>),
+            );
     }
 }
 
@@ -111,6 +125,12 @@ fn cash_stack(item: &Item) -> CashStack {
 
 fn phone_face(item: &Item) -> PhoneFace {
     PhoneFace(item.phone.2 == OTHER_FACE)
+}
+
+fn item_model(assets: &AssetServer, types: &ItemTypes, kind: ItemKind) -> Option<Handle<WorldAsset>> {
+    let ty = types.0.get(kind as usize)?;
+
+    Some(assets.load(GltfAssetLabel::Scene(0).from_asset(format!("models/items/{}.glb", model_name(kind as usize, &ty.name)))))
 }
 
 fn sync_items(
@@ -156,8 +176,7 @@ fn sync_items(
 
     for (i, item) in net.items.iter().enumerate().filter(|(i, item)| item.active && !drawn[*i] && out_in_world(&net, item)) {
         let Some(kind) = item.kind else { continue };
-        let Some(ty) = types.0.get(kind as usize) else { continue };
-        let model = assets.load(GltfAssetLabel::Scene(0).from_asset(format!("models/items/{}.glb", model_name(kind as usize, &ty.name))));
+        let Some(model) = item_model(&assets, &types, kind) else { continue };
         let mut entity = commands.spawn((NetItem { index: i, kind }, place(item), Snapshots::new(item.track.tick, place(item)), Visibility::default(), DespawnOnExit(Screen::InGame)));
 
         match kind {
@@ -286,5 +305,87 @@ fn carry_on_back(mut items: Query<(&OnBack, &mut Transform), Without<NetHuman>>,
         let [x, y, z] = [Vec3::X, Vec3::Y, Vec3::Z].map(|axis| turn * axis);
 
         *transform = Transform::from_translation(torso + z * BACK).with_rotation(Quat::from_mat3(&Mat3::from_cols(x, -z, y)));
+    }
+}
+
+fn free(net: &NetGame, item: &Item) -> bool {
+    item.active && item.parent_human < 0 && usize::try_from(item.parent_item).ok().and_then(|p| net.items.get(p)).is_none_or(|p| p.parent_human < 0)
+}
+
+fn segment_distance(a: Vec3, b: Vec3, p: Vec3) -> f32 {
+    let ab = b - a;
+    let t = if ab.length_squared() > 0.0 { ((p - a).dot(ab) / ab.length_squared()).clamp(0.0, 1.0) } else { 0.0 };
+
+    (a + ab * t - p).length()
+}
+
+fn reachable_item(net: &NetGame, types: &ItemTypes, (eyes, turn): (Vec3, Quat)) -> Option<usize> {
+    let p = net.me()?;
+    let h = net.humans.get(usize::try_from(p.human).ok()?)?;
+    let hand = (p.input_flags & flag::SHIFT != 0) as usize;
+
+    if h.vehicle != -1 || (!h.inventory[hand].is_empty() && !h.inventory[hand ^ 1].is_empty()) {
+        return None;
+    }
+
+    let end = eyes - turn * Vec3::Z * REACH;
+    let (target, _) = net
+        .items
+        .iter()
+        .enumerate()
+        .filter(|(_, it)| free(net, it))
+        .map(|(i, it)| (i, segment_distance(eyes, end, it.track.pos)))
+        .filter(|&(_, d)| d < 0.5)
+        .min_by(|a, b| a.1.total_cmp(&b.1))?;
+    let kind = net.items[target].kind.filter(|&k| k != ItemKind::TableTest)?;
+    let held = h.inventory[hand].first().and_then(|&i| net.items.get(usize::try_from(i).ok()?)).and_then(|i| i.kind);
+
+    match held {
+        Some(k) => types.0.get(k as usize).is_some_and(|t| t.can_mount_to[kind as usize] != 0).then_some(target),
+        None => Some(target),
+    }
+}
+
+fn highlight_target(
+    mut commands: Commands,
+    assets: Res<AssetServer>,
+    net: Res<NetGame>,
+    types: Res<ItemTypes>,
+    items: Query<(Entity, &NetItem, &Transform), Without<Highlight>>,
+    humans: Query<(&NetHuman, &Transform, &HumanPose), Without<Highlight>>,
+    mut highlights: Query<(Entity, &Highlight, &mut Transform)>,
+) {
+    let target = net
+        .me()
+        .and_then(|p| usize::try_from(p.human).ok())
+        .and_then(|h| humans.iter().find(|(nh, ..)| nh.0 == h))
+        .and_then(|(_, at, pose)| reachable_item(&net, &types, bone_at(at.translation, pose, BoneId::Head.index())))
+        .and_then(|i| items.iter().find(|(_, ni, _)| ni.index == i));
+
+    for (e, highlight, mut at) in &mut highlights {
+        match target.filter(|(item, ..)| *item == highlight.0) {
+            Some((_, _, place)) => *at = place.with_scale(Vec3::splat(1.125)),
+            None => commands.entity(e).despawn(),
+        }
+    }
+
+    let Some((item, ni, place)) = target.filter(|(item, ..)| !highlights.iter().any(|(_, h, _)| h.0 == *item)) else { return };
+    let Some(model) = item_model(&assets, &types, ni.kind) else { return };
+
+    commands.spawn((Highlight(item), WorldAssetRoot(model), place.with_scale(Vec3::splat(1.125)), DespawnOnExit(Screen::InGame)));
+}
+
+fn paint_highlight(
+    mut commands: Commands,
+    mut meshes: Query<(Entity, &mut MeshMaterial3d<StandardMaterial>), Added<MeshMaterial3d<StandardMaterial>>>,
+    highlights: Query<(), With<Highlight>>,
+    parents: Query<&ChildOf>,
+    white: Res<HighlightMaterial>,
+) {
+    for (e, mut material) in &mut meshes {
+        if parents.iter_ancestors(e).any(|a| highlights.contains(a)) {
+            material.0 = white.0.clone();
+            commands.entity(e).insert(NotShadowCaster);
+        }
     }
 }
