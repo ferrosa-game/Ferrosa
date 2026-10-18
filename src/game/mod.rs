@@ -12,11 +12,11 @@ mod engines;
 mod escape_menu;
 mod first_person;
 mod hud;
-mod humans;
+mod human_sync;
 mod inventory;
 mod items;
 mod mute;
-mod level;
+mod level_render;
 mod loading;
 pub mod netgame;
 mod network;
@@ -24,7 +24,7 @@ mod paper_doll;
 mod player_menu;
 mod roster;
 pub mod round_events;
-mod screens;
+mod item_displays;
 mod sky;
 mod smoothing;
 mod spectating;
@@ -54,7 +54,7 @@ impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
             loading::LoadingPlugin,
-            level::LevelPlugin,
+            level_render::LevelPlugin,
             sky::SkyPlugin,
             camera::CameraPlugin,
             controls::ControlsPlugin,
@@ -63,13 +63,13 @@ impl Plugin for GamePlugin {
             roster::RosterPlugin,
             first_person::FirstPersonPlugin,
             network::NetworkPlugin,
-            humans::HumansPlugin,
+            human_sync::HumansPlugin,
             vehicles::VehiclesPlugin,
             items::ItemsPlugin,
             smoothing::SmoothingPlugin,
             (hud::HudPlugin, inventory::InventoryPlugin, paper_doll::PaperDollPlugin, doors::DoorsPlugin, sounds::SoundsPlugin, chat::ChatPlugin, voice::VoicePlugin, spectating::SpectatingPlugin, bullets::BulletsPlugin, street_objects::StreetObjectsPlugin, effects::EffectsPlugin, engines::EnginesPlugin, mute::MutePlugin, briefing::BriefingPlugin),
         ))
-        .add_plugins((eliminator::EliminatorPlugin, admin::AdminPlugin, screens::ScreensPlugin))
+        .add_plugins((eliminator::EliminatorPlugin, admin::AdminPlugin, item_displays::ScreensPlugin))
         .add_systems(Update, scale_ui.run_if(in_state(Screen::InGame)))
         .add_systems(OnExit(Screen::InGame), |mut scale: ResMut<UiScale>| scale.0 = 1.0);
     }

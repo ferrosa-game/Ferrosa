@@ -10,7 +10,7 @@ mod audio;
 mod config;
 mod fonts;
 mod game;
-mod human;
+mod character_model;
 mod masterserver;
 mod menu;
 mod net;
@@ -31,7 +31,7 @@ fn main() {
             masterserver::MasterServerPlugin,
             ui::UiPlugin,
             menu::MenuPlugin,
-            human::HumanPlugin,
+            character_model::HumanPlugin,
             game::GamePlugin,
             rich_presence::RichPresencePlugin,
         ))

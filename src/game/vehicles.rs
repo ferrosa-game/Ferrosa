@@ -16,12 +16,11 @@ use ferrosa_world::{
 
 use super::{
     GAME_FPS, Level,
-    netgame::{NetGame, Track, Vehicle},
+    netgame::{NetGame, entities::Track, entities::Vehicle},
     smoothing::{Blend, Smoothing, Snapshots, glide},
 };
 use crate::menu::Screen;
 
-const WINDOW: &str = "window.";
 const GLASS: Color = Color::srgba(0.08, 0.1, 0.12, 0.55);
 const CLEAR_GLASS: Color = Color::srgba(1.0, 1.0, 1.0, 0.04);
 const COLUMNS: u32 = 16;
@@ -310,7 +309,7 @@ fn sync_traffic(
 }
 
 fn window_of(name: &str) -> Option<usize> {
-    name.strip_prefix(WINDOW)?.split(|c: char| !c.is_ascii_digit()).next()?.parse().ok()
+    name.strip_prefix("window.")?.split(|c: char| !c.is_ascii_digit()).next()?.parse().ok()
 }
 
 fn hide_physics(mut commands: Commands, named: Query<(Entity, &Name), Added<Name>>) {

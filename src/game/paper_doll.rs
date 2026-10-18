@@ -4,17 +4,17 @@ use ferrosa_world::skeleton::BONES;
 
 use super::{
     hud::{self, Stick, HudScreen, in_hand, is_phone, line, own, spawn_screen},
-    humans::NetHuman,
+    human_sync::NetHuman,
     netgame::NetGame,
 };
 use crate::{
-    human::{self, HumanPose, PARENTS},
+    character_model::{self, HumanPose, PARENTS},
     menu::Screen,
 };
 
 const AT: Vec2 = Vec2::new(512.0, 444.0);
 const SCALE: f32 = 64.0;
-const PARTS: [usize; human::BONES] = [0, 0, 0, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5];
+const PARTS: [usize; character_model::BONES] = [0, 0, 0, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5];
 const FULL_HEALTH: i32 = 100;
 const HALF_HEALTH: i32 = 50;
 const BLEEDING_ABOVE: i32 = 87;
@@ -38,18 +38,18 @@ fn spawn_doll(mut commands: Commands) {
     let screen = spawn_screen(&mut commands, (HudScreen, DollScreen), Stick::Bottom);
     let doll = commands.spawn((Node { position_type: PositionType::Absolute, ..default() }, Pickable::IGNORE, ChildOf(screen))).id();
 
-    for j in 0..human::BONES {
+    for j in 0..character_model::BONES {
         let node = Node { border: UiRect::all(px(1)), ..default() };
         commands.spawn((node, UiTransform::default(), BackgroundColor(Color::NONE), BorderColor::all(Color::NONE), DollBone(j), Pickable::IGNORE, ChildOf(doll)));
     }
 }
 
-fn doll_bones(pose: &HumanPose, view_yaw: f32) -> [(Vec3, Quat); human::BONES] {
+fn doll_bones(pose: &HumanPose, view_yaw: f32) -> [(Vec3, Quat); character_model::BONES] {
     let facing = Quat::from_rotation_y(-view_yaw).inverse();
     let rots = pose.0.map(|r| facing * r);
-    let mut pos = [Vec3::ZERO; human::BONES];
+    let mut pos = [Vec3::ZERO; character_model::BONES];
 
-    for j in 1..human::BONES {
+    for j in 1..character_model::BONES {
         let (b, p) = (&BONES[j], PARENTS[j]);
         pos[j] = pos[p] + rots[p] * b.joint + rots[j] * (b.offset - b.joint);
     }

@@ -17,7 +17,7 @@ use ferrosa_world::{
 use super::{
     Level, blocks,
     camera::GameCamera,
-    level::{AsphaltMaterial, BlockPanes, centred_mesh},
+    level_render::{AsphaltMaterial, BlockPanes, centred_mesh},
     netgame::{NetEvent, NetGame},
     network::NetTick,
     textures,

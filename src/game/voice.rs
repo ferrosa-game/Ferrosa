@@ -15,7 +15,7 @@ use super::{
     Level,
     chat::ChatState,
     hud::{Stick, align, rect, spawn_screen},
-    humans::{NetHuman, bone_at},
+    human_sync::{NetHuman, bone_at},
     netgame::{NetGame, VOICE_CHANNELS},
     network::NetTick,
     smoothing::Smoothing,
@@ -24,7 +24,7 @@ use super::{
 use crate::{
     audio::{MIC_RATE, MicSamples, Speakers},
     config::Config,
-    human::HumanPose,
+    character_model::HumanPose,
     menu::{
         Screen,
         options::{mouse_button_bit, scancode},

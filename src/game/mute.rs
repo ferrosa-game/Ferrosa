@@ -6,7 +6,7 @@ use bevy::{
 
 use super::{
     escape_menu::{GameMenu, MENU_LAYER},
-    netgame::{NetGame, Player},
+    netgame::{NetGame, entities::Player},
 };
 use crate::{
     fonts::GameFonts,

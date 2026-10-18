@@ -18,11 +18,11 @@ use super::{
     escape_menu::{GameMenu, OVERLAY_LAYER},
     first_person::FirstPerson,
     hud::{HudScreen, Stick, align, anchored, colour, spawn_screen, text},
-    humans::{NetHuman, bone_at},
+    human_sync::{NetHuman, bone_at},
     netgame::{ChatLine, NetGame},
     smoothing::Smoothing,
 };
-use crate::{fonts::GameFonts, human::HumanPose, menu::Screen};
+use crate::{fonts::GameFonts, character_model::HumanPose, menu::Screen};
 
 const LOG_AT: Vec2 = Vec2::new(4.0, 400.0);
 const LOG_SIZE: f32 = 20.0;

@@ -7,7 +7,7 @@ use super::{
     smoothing::{Smoothing, Snapshots},
 };
 use crate::{
-    human::{BONES, HumanLook, HumanPose, PARENTS},
+    character_model::{BONES, HumanLook, HumanPose, PARENTS},
     menu::Screen,
 };
 

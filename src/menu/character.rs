@@ -9,7 +9,7 @@ use bevy::{
 
 use crate::{
     config::{Config, config_path},
-    human::{HAIRS, HEADS, HumanExtent, HumanLook, HumanPose},
+    character_model::{HAIRS, HEADS, HumanExtent, HumanLook, HumanPose},
     menu::{Screen, back_button, gap, page, text},
     ui,
 };

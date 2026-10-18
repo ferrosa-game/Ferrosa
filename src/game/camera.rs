@@ -19,12 +19,12 @@ use super::{
     controls::{Fly, FlyFast, FlyLook, FlySlow, FlyZoom},
     escape_menu::GameMenu,
     first_person::FirstPerson,
-    humans::{NetHuman, bone_at},
+    human_sync::{NetHuman, bone_at},
     netgame::NetGame,
     smoothing::Smoothing,
     spectating::spectates,
 };
-use crate::{config::Config, human::HumanPose, menu::Screen};
+use crate::{config::Config, character_model::HumanPose, menu::Screen};
 
 pub const EXPOSURE: f32 = 13.5;
 const STEP: f32 = 0.25;

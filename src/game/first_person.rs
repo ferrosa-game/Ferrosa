@@ -5,12 +5,12 @@ use ferrosa_world::skeleton::BoneId;
 
 use super::{
     camera::GameCamera,
-    humans::{NetHuman, bone_at, pose},
-    netgame::{Human, NetGame},
+    human_sync::{NetHuman, bone_at, pose},
+    netgame::{entities::Human, NetGame},
     network::NetTick,
     smoothing::Smoothing,
 };
-use crate::human::{HideHead, HumanPose};
+use crate::character_model::{HideHead, HumanPose};
 
 const CAMERA_TURN: f32 = 0.125;
 const MIN_TURN: f32 = 1.525_878_9e-5;

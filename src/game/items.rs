@@ -13,11 +13,11 @@ use ferrosa_world::{
 };
 
 use super::{
-    humans::{NetHuman, bone_at},
-    netgame::{Item, NetGame},
+    human_sync::{NetHuman, bone_at},
+    netgame::{entities::Item, NetGame},
     smoothing::{Smoothing, Snapshots},
 };
-use crate::{human::HumanPose, menu::Screen};
+use crate::{character_model::HumanPose, menu::Screen};
 
 const FIRST_POCKET: u32 = 2;
 const BACK: f32 = 0.25;

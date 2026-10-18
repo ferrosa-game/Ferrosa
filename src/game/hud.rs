@@ -11,7 +11,7 @@ use super::{
     controls::{InputState, flag},
     escape_menu::{BACKDROP_LAYER, GameMenu, OVERLAY_LAYER},
     items::ItemTypes,
-    netgame::{Human, NetGame, Player},
+    netgame::{entities::Human, NetGame, entities::Player},
 };
 use crate::{
     fonts::GameFonts,

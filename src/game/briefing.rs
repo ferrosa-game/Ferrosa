@@ -9,7 +9,7 @@ use super::{
     escape_menu::{GameMenu, OVERLAY_LAYER},
     hud::{Stick, align, anchored, colour, rect, spawn_screen, text},
     items::ItemTypes,
-    netgame::{Mission, NetGame, PROTECTOR, Player},
+    netgame::{Mission, NetGame, PROTECTOR, entities::Player},
 };
 use crate::{fonts::GameFonts, menu::Screen};
 

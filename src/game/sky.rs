@@ -5,7 +5,7 @@ use bevy::{
 };
 
 use crate::{
-    human::SHADOW_ONLY,
+    character_model::SHADOW_ONLY,
     menu::{Screen, join::ServerSync},
 };
 

@@ -4,7 +4,7 @@ use bevy::{ecs::component::Mutable, prelude::*};
 
 use super::{netgame::NetGame, network::TICK_SECONDS};
 use crate::{
-    human::{BONES, HumanPose},
+    character_model::{BONES, HumanPose},
     menu::Screen,
 };
 

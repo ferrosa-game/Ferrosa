@@ -10,7 +10,7 @@ use ferrosa_protocol::clientbound::game::ItemKind;
 
 use super::{
     items::NetItem,
-    netgame::{Item, NetGame},
+    netgame::{entities::Item, NetGame},
 };
 use crate::{
     fonts::{FIXEDSYS, ROCKWELL},

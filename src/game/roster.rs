@@ -7,7 +7,7 @@ use ferrosa_protocol::{
 use super::{
     escape_menu::{GameMenu, ROSTER_LAYER},
     mute::{Voice, VoiceIcons, voice_icon},
-    netgame::{NetGame, Player},
+    netgame::{NetGame, entities::Player},
     player_menu::Choice,
 };
 use crate::{
