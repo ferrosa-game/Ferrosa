@@ -19,8 +19,7 @@ use crate::{
     game::{
         netgame::NetGame,
         round_events::{GameStateChanged, TeamChanged},
-    },
-    menu::Screen,
+    }, menu::Screen, steam::Steam,
 };
 
 const SPACING: Duration = Duration::from_secs(4);
@@ -43,7 +42,8 @@ struct DiscordLink {
 #[derive(Resource, Default)]
 struct Presence {
     sent: Option<Activity>,
-    last_send: Option<Duration>,
+    last_discord_send: Option<Duration>,
+    last_steam_send: Option<Duration>,
     round_start: Option<i64>,
 }
 
@@ -58,7 +58,8 @@ impl Plugin for RichPresencePlugin {
                 debug!("discord presence: team now {:?}", event.team);
                 presence.sent = None;
             })
-            .add_systems(Update, push_presence.run_if(resource_exists::<DiscordLink>))
+            .add_systems(Update, push_discord_presence.run_if(resource_exists::<DiscordLink>))
+            .add_systems(Update, push_steam_presence)
             .add_systems(OnEnter(Screen::InGame), |mut presence: ResMut<Presence>| presence.round_start = Some(now()))
             .add_systems(OnExit(Screen::InGame), |mut presence: ResMut<Presence>| presence.round_start = None);
     }
@@ -163,7 +164,26 @@ fn wanted(screen: &Screen, net: Option<&NetGame>, presence: &Presence) -> Activi
     }
 }
 
-fn push_presence(time: Res<Time<Real>>, screen: Res<State<Screen>>, net: Option<Res<NetGame>>, link: Res<DiscordLink>, mut presence: ResMut<Presence>) {
+fn push_steam_presence(screen: Res<State<Screen>>, net: Option<Res<NetGame>>, time: Res<Time<Real>>, steam: Res<Steam>, mut presence: ResMut<Presence>) {
+    let activity = wanted(screen.get(), net.as_deref(), &presence);
+    let elapsed = time.elapsed();
+
+    if presence.last_steam_send.is_some_and(|t| elapsed - t < SPACING) {
+        return
+    }
+
+    if let Some(ref client) = steam.client {
+        let friends = client.friends();
+
+        friends.set_rich_presence("steam_display", activity.state.as_deref());
+        friends.set_rich_presence("steam_player_group", activity.party.as_deref());
+        friends.set_rich_presence("gamestatus", activity.state.as_deref());
+    }
+
+    presence.last_steam_send = Some(elapsed);
+}
+
+fn push_discord_presence(time: Res<Time<Real>>, screen: Res<State<Screen>>, net: Option<Res<NetGame>>, link: Res<DiscordLink>, mut presence: ResMut<Presence>, steam: Res<Steam>) {
     if !link.connected.load(Ordering::Relaxed) {
         presence.sent = None;
         return;
@@ -172,7 +192,7 @@ fn push_presence(time: Res<Time<Real>>, screen: Res<State<Screen>>, net: Option<
     let activity = wanted(screen.get(), net.as_deref(), &presence);
     let elapsed = time.elapsed();
 
-    if presence.sent.as_ref() == Some(&activity) || presence.last_send.is_some_and(|t| elapsed - t < SPACING) {
+    if presence.sent.as_ref() == Some(&activity) || presence.last_discord_send.is_some_and(|t| elapsed - t < SPACING) {
         return;
     }
 
@@ -199,5 +219,5 @@ fn push_presence(time: Res<Time<Real>>, screen: Res<State<Screen>>, net: Option<
     });
 
     presence.sent = Some(activity);
-    presence.last_send = Some(elapsed);
+    presence.last_discord_send = Some(elapsed);
 }

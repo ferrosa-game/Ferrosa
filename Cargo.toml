@@ -20,6 +20,9 @@ ferrosa-world = { path = "../new_server/crates/ferrosa-world" }
 binrw = "0.15.0"
 discord-sdk = "0.4.0"
 
+[build-dependencies]
+winresource = "0.1"
+
 [profile.dev]
 opt-level = 1
 

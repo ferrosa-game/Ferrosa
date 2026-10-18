@@ -13,6 +13,12 @@ fn steam_api_dll() -> Option<PathBuf> {
         .max()
 }
 
+fn set_windows_icon() {
+    let mut res = winresource::WindowsResource::new();
+    res.set_icon("assets/icon.ico");
+    res.compile().unwrap();
+}
+
 fn main() {
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         let out = PathBuf::from(std::env::var("OUT_DIR").unwrap());
@@ -22,6 +28,8 @@ fn main() {
         {
             let _ = std::fs::copy(dll, profile_dir.join("steam_api64.dll"));
         }
+
+        set_windows_icon();
     }
 
     println!("cargo:rerun-if-changed=build.rs");
