@@ -4,6 +4,7 @@ use super::{
     Level,
     camera::GameCamera,
     netgame::{NetEvent, NetGame},
+    round_events,
 };
 use crate::{menu::Screen, net::ClientSocket};
 
@@ -49,9 +50,10 @@ fn receive_packets(mut commands: Commands, mut net: ResMut<NetGame>, mut socket:
     }
 }
 
-fn play_events(mut net: ResMut<NetGame>, mut happenings: MessageWriter<NetEvent>) {
+fn play_events(mut commands: Commands, mut net: ResMut<NetGame>, mut happenings: MessageWriter<NetEvent>) {
     net.process_events();
     happenings.write_batch(net.happenings.drain(..));
+    round_events::watch(&mut commands, &mut net);
 }
 
 fn start_new_round(mut commands: Commands, mut net: ResMut<NetGame>, level: Option<Res<Level>>, mut next: ResMut<NextState<Screen>>) {

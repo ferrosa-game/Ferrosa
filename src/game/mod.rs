@@ -23,6 +23,7 @@ mod network;
 mod paper_doll;
 mod player_menu;
 mod roster;
+pub mod round_events;
 mod screens;
 mod sky;
 mod smoothing;

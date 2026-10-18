@@ -13,11 +13,12 @@ cpal = "0.17.3"
 rodio = { version = "0.22", features = ["wav"] }
 rusty-opus = "1.0.1"
 sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
-tokio = { version = "1", features = ["rt", "time"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "time"] }
 ferrosa-protocol = { path = "../new_server/crates/ferrosa-protocol" }
 ferrosa-map = { path = "../new_server/crates/ferrosa-map" }
 ferrosa-world = { path = "../new_server/crates/ferrosa-world" }
 binrw = "0.15.0"
+discord-sdk = "0.4.0"
 
 [profile.dev]
 opt-level = 1

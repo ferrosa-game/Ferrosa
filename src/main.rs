@@ -8,6 +8,7 @@ mod menu;
 mod net;
 mod steam;
 mod ui;
+mod rich_presence;
 
 use bevy::{
     prelude::*,
@@ -29,6 +30,7 @@ fn main() {
             menu::MenuPlugin,
             human::HumanPlugin,
             game::GamePlugin,
+            rich_presence::RichPresencePlugin,
         ))
         .add_systems(Startup, |mut commands: Commands| {
             commands.spawn((Camera2d, IsDefaultUiCamera));

@@ -431,6 +431,8 @@ pub struct NetGame {
     pub role: i32,
     pub saviors: (i32, i32),
     pub target: Option<Vec3>,
+    pub seen_state: Option<GameState>,
+    pub seen_team: Option<Team>,
 }
 
 impl NetGame {
@@ -477,6 +479,8 @@ impl NetGame {
             role: -1,
             saviors: (0, 0),
             target: None,
+            seen_state: None,
+            seen_team: None,
             decoder: ObjectDecoder::default(),
             events: vec![None; EVENTS],
             events_received: 0,
