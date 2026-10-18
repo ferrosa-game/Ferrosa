@@ -241,8 +241,8 @@ fn spawn_hud(mut commands: Commands, fonts: Res<GameFonts>) {
     commands.spawn((node, shift, TabHint, text("Press Tab for Menu", &fonts.rockwell, 24.0, white), Visibility::Hidden, ChildOf(top)));
     let (node, shift) = anchored(align::TOP_LEFT, Vec2::new(192.0, 4.0));
     commands.spawn((node, shift, SharesLine, text("", &fonts.rockwell, 24.0, white), ChildOf(top_left)));
-    let (node, shift) = anchored(align::TOP_LEFT, Vec2::new(512.0, 4.0));
-    commands.spawn((node, shift, BudgetLine, text("", &fonts.rockwell, 24.0, white), ChildOf(top_left)));
+    let (node, shift) = anchored(align::CENTRE_X, Vec2::new(512.0, 4.0));
+    commands.spawn((node, shift, BudgetLine, text("", &fonts.rockwell, 24.0, white), ChildOf(top)));
 
     let (node, shift) = anchored(align::CENTRE_X, Vec2::new(512.0, 384.0));
     commands.spawn((Node { flex_direction: FlexDirection::Column, align_items: AlignItems::Center, ..node }, shift, PhoneHelp, ChildOf(centre)));
@@ -424,7 +424,7 @@ fn show_menu_line(
     let has_menu = p.menu != MenuType::Empty;
 
     let price = corporation_index(p.team).map(|t| net.share_prices[t]);
-    let hint = has_menu && !open;
+    let hint = has_menu && !open && !corporation;
     let wealth = has_menu && open && !world;
 
     let first = wealth.then(|| format!("${}", p.money));

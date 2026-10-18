@@ -26,7 +26,7 @@ use super::{
 };
 use crate::{config::Config, character_model::HumanPose, menu::Screen};
 
-pub const EXPOSURE: f32 = 13.5;
+pub const EXPOSURE: f32 = 14.5;
 const STEP: f32 = 0.25;
 const FAST: f32 = 4.0;
 const SLOW: f32 = 0.25;
@@ -92,7 +92,7 @@ fn spawn_camera(mut commands: Commands, level: Res<Level>) {
         AtmosphereSettings::default(),
         AtmosphereEnvironmentMapLight::default(),
         Exposure { ev100: EXPOSURE },
-        Tonemapping::AcesFitted,
+        Tonemapping::AgX,
         Bloom::OLD_SCHOOL,
         spectator.transform(),
         spectator,

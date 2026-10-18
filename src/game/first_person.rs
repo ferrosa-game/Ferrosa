@@ -39,7 +39,7 @@ impl Plugin for FirstPersonPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<FirstPerson>()
             .add_systems(FixedUpdate, follow_head.in_set(NetTick::Follow))
-            .add_systems(Update, (choose_view, hide_own_head, look_through_eyes).chain().in_set(Smoothing::View));
+            .add_systems(Update, (choose_view, hide_own_head, look_through_eyes, change_view_width).chain().in_set(Smoothing::View));
     }
 }
 
@@ -177,4 +177,11 @@ fn look_through_eyes(
     let (eyes, _) = head_at(at.translation, posed);
 
     **camera = Transform::from_translation(eyes).with_rotation(Quat::from_scaled_axis(fp.coming * time.overstep_fraction()) * fp.rot);
+}
+
+fn change_view_width(net: Option<Res<NetGame>>, fp: Res<FirstPerson>, mut projection: Single<&mut Projection, With<GameCamera>>) {
+    let Projection::Perspective(p) = &mut **projection else { return };
+    let zoom = net.as_deref().filter(|n| own_human(n, &fp).is_some()).and_then(|n| n.me()).map_or(0.0, |p| p.zoom_eased);
+
+    p.fov = 2.0 * (0.5625 * (1.0 - zoom)).atan();
 }
