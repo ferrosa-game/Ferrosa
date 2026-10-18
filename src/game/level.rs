@@ -1,6 +1,7 @@
 use bevy::{
     asset::RenderAssetUsages,
     camera::visibility::VisibilityRange,
+    image::ImageSampler,
     light::NotShadowCaster,
     mesh::{Indices, PrimitiveTopology},
     prelude::*,
@@ -25,12 +26,16 @@ const GRASS: Color = Color::srgb(0.25, 0.33, 0.15);
 const DARK: Color = Color::srgb(0.06, 0.06, 0.06);
 const MISSING: Color = Color::srgb(1.0, 0.25, 0.5);
 const DARK_MATERIAL: usize = 2;
+const SHARPEST_SEAM: u32 = 32;
 
 #[derive(Component)]
 pub struct BlockPanes {
     pub origin: IVec3,
     pub centre: Vec3,
 }
+
+#[derive(Resource)]
+pub struct AsphaltMaterial(pub Handle<StandardMaterial>);
 
 #[derive(Resource)]
 struct BlockMaterials {
@@ -53,6 +58,7 @@ impl Plugin for LevelPlugin {
             .add_systems(OnExit(Screen::InGame), |mut commands: Commands| {
                 commands.remove_resource::<Level>();
                 commands.remove_resource::<BlockMaterials>();
+                commands.remove_resource::<AsphaltMaterial>();
             });
     }
 }
@@ -96,10 +102,23 @@ fn make_materials(mut commands: Commands, level: Res<Level>, geometry: Res<Level
     let marked = (1..=blocks::MARKINGS).map(|layer| (blocks::ASPHALT, asphalt.map(|a| textures::road_markings(a, layer))));
     let plain = decoded.iter().cloned().enumerate();
 
-    let blocks = plain
+    let marked_from = decoded.len();
+    let blocks: Vec<Handle<StandardMaterial>> = plain
         .chain(marked)
-        .map(|(k, pixels)| {
-            let image = pixels.map(|p| images.add(p.into_image()));
+        .enumerate()
+        .map(|(n, (k, pixels))| {
+            let image = pixels.map(|p| {
+                let width = p.width;
+                let mut image = p.into_image();
+
+                if n >= marked_from
+                    && let ImageSampler::Descriptor(sampler) = &mut image.sampler
+                {
+                    sampler.lod_max_clamp = (width / SHARPEST_SEAM).max(1).ilog2() as f32;
+                }
+
+                images.add(image)
+            });
             let colour = match (k, &image) {
                 (_, Some(_)) => Color::WHITE,
                 (DARK_MATERIAL, _) => DARK,
@@ -139,6 +158,7 @@ fn make_materials(mut commands: Commands, level: Res<Level>, geometry: Res<Level
         ..default()
     });
 
+    commands.insert_resource(AsphaltMaterial(blocks[blocks::ASPHALT].clone()));
     commands.insert_resource(BlockMaterials { blocks, facades, glass });
 }
 

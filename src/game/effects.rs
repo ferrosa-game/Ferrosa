@@ -17,7 +17,7 @@ use ferrosa_world::{
 use super::{
     Level, blocks,
     camera::GameCamera,
-    level::{BlockPanes, centred_mesh},
+    level::{AsphaltMaterial, BlockPanes, centred_mesh},
     netgame::{NetEvent, NetGame},
     network::NetTick,
     textures,
@@ -50,8 +50,8 @@ const GRAZE: i32 = 3;
 const CASE_MODEL: &str = "models/items/case.glb";
 const CHIP_MODEL: &str = "models/items/chip.glb";
 const SMOKE_COLOUR: [f32; 3] = [1.0, 1.0, 0.75];
-const BLOOD_COLOUR: [f32; 3] = [0.2, 0.0, 0.0];
 const CHIP_COLOUR: Color = Color::srgb(0.3, 0.3, 0.3);
+const BLOOD_SHADE: Color = Color::srgb(0.25, 0.0, 0.0);
 const GLASS: Color = Color::srgba(0.6, 0.7, 0.75, 0.35);
 
 #[derive(Clone, Copy, PartialEq)]
@@ -112,6 +112,7 @@ struct Piece {
     vel: Vec3,
     axes: [Vec3; 3],
     spin: Vec3,
+    was: (Vec3, [Vec3; 3]),
 }
 
 #[derive(Resource)]
@@ -119,6 +120,7 @@ struct EffectAssets {
     case: (Handle<Mesh>, Handle<StandardMaterial>),
     chip: (Handle<Mesh>, Handle<StandardMaterial>),
     spots: Handle<Mesh>,
+    blood: Handle<Mesh>,
     glass: Handle<Mesh>,
 }
 
@@ -129,7 +131,7 @@ impl Plugin for EffectsPlugin {
         app.init_resource::<Particles>()
             .add_systems(OnEnter(Screen::InGame), spawn_effect_assets)
             .add_systems(FixedUpdate, (emit_effects, simulate_effects).chain().in_set(NetTick::Follow).run_if(in_state(Screen::InGame)).run_if(resource_exists::<EffectAssets>))
-            .add_systems(Update, draw_particles.run_if(in_state(Screen::InGame)).run_if(resource_exists::<EffectAssets>))
+            .add_systems(Update, (draw_particles, place_pieces).run_if(in_state(Screen::InGame)).run_if(resource_exists::<EffectAssets>))
             .add_systems(OnExit(Screen::InGame), |mut commands: Commands, mut particles: ResMut<Particles>| {
                 *particles = Particles::default();
                 commands.remove_resource::<EffectAssets>();
@@ -155,13 +157,17 @@ fn spawn_effect_assets(mut commands: Commands, assets: Res<AssetServer>, mut mes
     spot.sampler = ImageSampler::linear();
 
     let spots = meshes.add(empty_mesh());
+    let blood = meshes.add(empty_mesh());
     let glass = meshes.add(empty_mesh());
-    let spot_material = StandardMaterial { base_color: Color::WHITE, base_color_texture: Some(images.add(spot)), unlit: true, alpha_mode: AlphaMode::Blend, cull_mode: None, ..default() };
+    let spot_image = images.add(spot);
+    let spot_material = StandardMaterial { base_color: Color::WHITE, base_color_texture: Some(spot_image.clone()), unlit: true, alpha_mode: AlphaMode::Blend, cull_mode: None, ..default() };
+    let blood_material = StandardMaterial { base_color: BLOOD_SHADE, base_color_texture: Some(spot_image), perceptual_roughness: 1.0, alpha_mode: AlphaMode::Blend, cull_mode: None, ..default() };
     let glass_material = StandardMaterial { base_color: GLASS, alpha_mode: AlphaMode::Blend, perceptual_roughness: 0.05, reflectance: 1.0, double_sided: true, cull_mode: None, ..default() };
 
     commands.spawn((Mesh3d(spots.clone()), MeshMaterial3d(materials.add(spot_material)), NoFrustumCulling, NotShadowCaster, DespawnOnExit(Screen::InGame)));
+    commands.spawn((Mesh3d(blood.clone()), MeshMaterial3d(materials.add(blood_material)), NoFrustumCulling, NotShadowCaster, DespawnOnExit(Screen::InGame)));
     commands.spawn((Mesh3d(glass.clone()), MeshMaterial3d(materials.add(glass_material)), NoFrustumCulling, NotShadowCaster, DespawnOnExit(Screen::InGame)));
-    commands.insert_resource(EffectAssets { case: (primitive(CASE_MODEL), case_material), chip: (primitive(CHIP_MODEL), chip_material), spots, glass });
+    commands.insert_resource(EffectAssets { case: (primitive(CASE_MODEL), case_material), chip: (primitive(CHIP_MODEL), chip_material), spots, blood, glass });
 }
 
 fn random_vec3(scale: f32, base: f32) -> Vec3 {
@@ -293,6 +299,7 @@ fn emit_effects(
     pieces: Query<Entity, With<Piece>>,
     mut panes: Query<(&BlockPanes, &mut Mesh3d, &mut Visibility)>,
     mut meshes: ResMut<Assets<Mesh>>,
+    asphalt: Option<Res<AsphaltMaterial>>,
 ) {
     if particles.round != net.round {
         *particles = Particles { round: net.round, ..default() };
@@ -311,13 +318,13 @@ fn emit_effects(
         let turn = (rand::random_range(-1.0f32..1.0) * 4.0 + 12.0) / 60.0;
         let back = -(rand::random_range(-1.0f32..1.0) * 4.0 + 12.0) / 60.0;
         let spin = axes[1] * turn + axes[0] * back;
-        let (mesh, material) = if kind == PieceKind::Case { &effect_assets.case } else { &effect_assets.chip };
+        let (mesh, material) = if kind == PieceKind::Case { effect_assets.case.clone() } else { (effect_assets.chip.0.clone(), asphalt.as_ref().map_or(effect_assets.chip.1.clone(), |a| a.0.clone())) };
 
         particles.pieces += 1;
         commands.spawn((
-            Piece { kind, pos, vel, axes, spin },
-            Mesh3d(mesh.clone()),
-            MeshMaterial3d(material.clone()),
+            Piece { kind, pos, vel, axes, spin, was: (pos, axes) },
+            Mesh3d(mesh),
+            MeshMaterial3d(material),
             piece_transform(pos, &axes),
             NotShadowCaster,
             DespawnOnExit(Screen::InGame),
@@ -423,7 +430,7 @@ fn settle(p: &mut Particle, map: &Map) {
     }
 }
 
-fn simulate_effects(mut net: ResMut<NetGame>, level: Option<Res<Level>>, mut particles: ResMut<Particles>, mut pieces: Query<(&mut Piece, &mut Transform)>) {
+fn simulate_effects(mut net: ResMut<NetGame>, level: Option<Res<Level>>, mut particles: ResMut<Particles>, mut pieces: Query<&mut Piece>) {
     if matches!(net.game_state, GameState::Restarting | GameState::Paused) {
         return;
     }
@@ -480,12 +487,14 @@ fn simulate_effects(mut net: ResMut<NetGame>, level: Option<Res<Level>>, mut par
         }
     }
 
-    for (mut piece, mut transform) in &mut pieces {
+    for mut piece in &mut pieces {
+        let piece = &mut *piece;
+        piece.was = (piece.pos, piece.axes);
+
         if piece.vel == Vec3::ZERO && piece.spin == Vec3::ZERO {
             continue;
         }
 
-        let piece = &mut *piece;
         let turn = piece.spin.length();
 
         if turn > MIN_SPIN {
@@ -517,8 +526,6 @@ fn simulate_effects(mut net: ResMut<NetGame>, level: Option<Res<Level>>, mut par
                 piece.spin = Vec3::ZERO;
             }
         }
-
-        *transform = piece_transform(piece.pos, &piece.axes);
     }
 
     particles.list.retain_mut(|p| {
@@ -581,10 +588,23 @@ impl Batch {
     }
 }
 
+fn place_pieces(time: Res<Time<Fixed>>, mut pieces: Query<(&Piece, &mut Transform)>) {
+    let a = time.overstep_fraction();
+
+    for (piece, mut transform) in &mut pieces {
+        let (from, to) = (piece_transform(piece.was.0, &piece.was.1), piece_transform(piece.pos, &piece.axes));
+        let place = Transform::from_translation(from.translation.lerp(to.translation, a)).with_rotation(from.rotation.slerp(to.rotation, a));
+
+        if *transform != place {
+            *transform = place;
+        }
+    }
+}
+
 fn draw_particles(particles: Res<Particles>, effect_assets: Res<EffectAssets>, camera: Option<Single<&Transform, With<GameCamera>>>, mut meshes: ResMut<Assets<Mesh>>) {
     let Some(camera) = camera else { return };
     let (right, up, back) = (camera.right().as_vec3(), camera.up().as_vec3(), camera.back().as_vec3());
-    let (mut spots, mut glass) = (Batch::default(), Batch::default());
+    let (mut spots, mut blood, mut glass) = (Batch::default(), Batch::default(), Batch::default());
 
     for p in &particles.list {
         let fade = (p.life as f32 * 0.03125).min(1.0);
@@ -592,7 +612,7 @@ fn draw_particles(particles: Res<Particles>, effect_assets: Res<EffectAssets>, c
 
         match p.kind {
             Kind::Smoke => spots.quad(corners(right, up, p.size), back, [SMOKE_COLOUR[0], SMOKE_COLOUR[1], SMOKE_COLOUR[2], fade]),
-            Kind::Blood => spots.quad(corners(right, up, p.size), back, [BLOOD_COLOUR[0], BLOOD_COLOUR[1], BLOOD_COLOUR[2], fade]),
+            Kind::Blood => blood.quad(corners(right, up, p.size), back, [1.0, 1.0, 1.0, fade]),
             Kind::Shard => {
                 let c = corners(p.frame[0], p.frame[1], p.size);
                 glass.triangle([c[0], c[1], c[2]]);
@@ -604,6 +624,10 @@ fn draw_particles(particles: Res<Particles>, effect_assets: Res<EffectAssets>, c
 
     if let Some(mut mesh) = meshes.get_mut(&effect_assets.spots) {
         spots.write(&mut mesh);
+    }
+
+    if let Some(mut mesh) = meshes.get_mut(&effect_assets.blood) {
+        blood.write(&mut mesh);
     }
 
     if let Some(mut mesh) = meshes.get_mut(&effect_assets.glass) {
