@@ -24,7 +24,7 @@ pub fn fly(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, set
     if input.right && !input.left {
         let slow = 1.0 - p.zoom_eased;
         p.view_yaw_delta += slow * input.dx / 650.0;
-        p.view_pitch += slow * input.dy / 650.0;
+        p.view_pitch += if settings.invert { -1.0 } else { 1.0 } * slow * input.dy / 650.0;
 
         p.view_yaw_delta = p.view_yaw_delta.clamp(-MAX_YAW as f32, MAX_YAW as f32);
         p.view_pitch = p.view_pitch.clamp(-FRAC_PI_2, FRAC_PI_2);
@@ -33,8 +33,8 @@ pub fn fly(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, set
             *s = if *s < -1.0 { *s + 1.0 } else if *s <= 1.0 { 0.0 } else { *s - 1.0 };
         }
 
-        input.stick[0] += 0.0625 * input.dx;
-        input.stick[1] += 0.0625 * input.dy;
+        input.stick[0] += 1.0 / 16.0 * input.dx;
+        input.stick[1] += 1.0 / 16.0 * input.dy;
 
         p.gear_y = input.stick[0];
         p.gear_x -= input.stick[1];
@@ -47,10 +47,10 @@ pub fn fly(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, set
 
     p.zoom = (p.zoom + input.wheel as f32 * 0.125).clamp(0.0, 0.875);
     input.wheel = 0;
-    p.zoom_eased += (p.zoom - p.zoom_eased) * 0.0625;
+    p.zoom_eased += (p.zoom - p.zoom_eased) / 16.0;
 
     let axis = |plus: Control, minus: Control| input.held(plus) as i32 as f32 - input.held(minus) as i32 as f32;
-    p.forward_back += 0.03125 * axis(Control::Forward, Control::Back);
+    p.forward_back += 1.0 / 32.0 * axis(Control::Forward, Control::Back);
     p.left_right += axis(Control::Right, Control::Left);
 
     let keys = [(Control::Jump, flag::JUMP), (Control::Crouch, flag::CROUCH), (Control::Shift, flag::SHIFT), (Control::Use, flag::USE)];

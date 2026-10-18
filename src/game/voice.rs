@@ -22,12 +22,12 @@ use super::{
     sounds::{Ears, Emitter},
 };
 use crate::{
+    keys::{mouse_button_bit, scancode},
     audio::{MIC_RATE, MicSamples, Speakers},
     config::Config,
     character_model::HumanPose,
     menu::{
         Screen,
-        options::{mouse_button_bit, scancode},
     },
 };
 
@@ -357,6 +357,6 @@ fn play_voices(
         });
 
         emitter.place(at, radius, &ears);
-        emitter.player().set_volume(channel.sight * ears.volume * config.voice_gain);
+        emitter.player().set_volume(channel.sight * ears.volume * config.voice_gain());
     }
 }

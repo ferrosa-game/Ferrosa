@@ -1,5 +1,4 @@
 use bevy::{
-    asset::RenderAssetUsages,
     camera::visibility::NoFrustumCulling,
     image::ImageSampler,
     mesh::{Indices, PrimitiveTopology},
@@ -10,7 +9,7 @@ use ferrosa_world::trace::line_intersect_level;
 
 use super::{
     Level,
-    effects::frame_across,
+    effects::{empty_mesh, frame_across},
     netgame::{NetEvent, NetGame},
     network::NetTick,
     textures,
@@ -20,10 +19,10 @@ use crate::menu::Screen;
 const MAX_BULLETS: usize = 0x4000;
 const MAX_HOLES: usize = 0x4000;
 const LIFETIME: i32 = 600;
-const GRAVITY: f32 = 0.002_722_222_4;
-const DRAG: [f32; 4] = [0.004_560_367, 0.003_916_045_7, 0.007_952_156, 0.005_832_072];
+const GRAVITY: f32 = 9.8 / 60.0 / 60.0;
+const DRAG: [f32; 4] = [0.00456, 0.003916, 0.007952, 0.005832];
 const TRACER_LIFE: i32 = 3;
-const HOLE_LIFT: f32 = 0.015625;
+const HOLE_LIFT: f32 = 1.0 / 64.0;
 const RICOCHET: i32 = 0;
 
 struct Bullet {
@@ -76,17 +75,9 @@ impl Plugin for BulletsPlugin {
     }
 }
 
-fn empty_mesh(topology: PrimitiveTopology) -> Mesh {
-    Mesh::new(topology, RenderAssetUsages::default())
-        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vec![[0.0f32; 3]; 2])
-        .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, vec![[0.0f32; 4]; 2])
-        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0, 1.0, 0.0f32]; 2])
-        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0f32; 2]; 2])
-}
-
 fn spawn_shot_meshes(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, mut images: ResMut<Assets<Image>>) {
-    let tracers = meshes.add(empty_mesh(PrimitiveTopology::LineList));
-    let holes = meshes.add(empty_mesh(PrimitiveTopology::TriangleList).with_inserted_indices(Indices::U32(Vec::new())));
+    let tracers = meshes.add(empty_mesh(PrimitiveTopology::LineList, 2));
+    let holes = meshes.add(empty_mesh(PrimitiveTopology::TriangleList, 2).with_inserted_indices(Indices::U32(Vec::new())));
 
     let mut spot = textures::particle().into_image();
     spot.sampler = ImageSampler::linear();
@@ -137,7 +128,7 @@ fn fly_bullets(net: Res<NetGame>, level: Option<Res<Level>>, mut shots: ResMut<S
             NetEvent::BulletHit { hit: RICOCHET, pos, normal } if holes.len() < MAX_HOLES => {
                 let n = normal.normalize_or_zero();
                 let (side, up) = frame_across(n);
-                let size = (rand::random::<u32>() & 0x1f) as f32 * 0.000_976_562_5 + 0.03125;
+                let size = (rand::random::<u32>() & 0x1f) as f32 / 1024.0 + 1.0 / 32.0;
 
                 holes.push(Hole { pos: pos + n * HOLE_LIFT, side, up, size });
             }

@@ -8,7 +8,10 @@ use ferrosa_protocol::{
 };
 
 use super::{escape_menu::GameMenu, netgame::NetGame};
-use crate::menu::Screen;
+use crate::{
+    keys::{DIGIT_KEYS, LETTER_KEYS},
+    menu::Screen,
+};
 
 const CTRL_FLAG: u32 = 0x100;
 const NEW_LINE: u32 = 0xa;
@@ -81,19 +84,11 @@ fn shifted(c: u8) -> u8 {
 }
 
 fn character(key: KeyCode) -> Option<u8> {
-    const LETTERS: [KeyCode; 26] = [
-        KeyCode::KeyA, KeyCode::KeyB, KeyCode::KeyC, KeyCode::KeyD, KeyCode::KeyE, KeyCode::KeyF, KeyCode::KeyG, KeyCode::KeyH, KeyCode::KeyI,
-        KeyCode::KeyJ, KeyCode::KeyK, KeyCode::KeyL, KeyCode::KeyM, KeyCode::KeyN, KeyCode::KeyO, KeyCode::KeyP, KeyCode::KeyQ, KeyCode::KeyR,
-        KeyCode::KeyS, KeyCode::KeyT, KeyCode::KeyU, KeyCode::KeyV, KeyCode::KeyW, KeyCode::KeyX, KeyCode::KeyY, KeyCode::KeyZ,
-    ];
-    const DIGITS: [KeyCode; 10] =
-        [KeyCode::Digit0, KeyCode::Digit1, KeyCode::Digit2, KeyCode::Digit3, KeyCode::Digit4, KeyCode::Digit5, KeyCode::Digit6, KeyCode::Digit7, KeyCode::Digit8, KeyCode::Digit9];
-
-    if let Some(k) = LETTERS.iter().position(|&l| l == key) {
+    if let Some(k) = LETTER_KEYS.iter().position(|&l| l == key) {
         return Some(b'a' + k as u8);
     }
 
-    if let Some(k) = DIGITS.iter().position(|&d| d == key) {
+    if let Some(k) = DIGIT_KEYS.iter().position(|&d| d == key) {
         return Some(b'0' + k as u8);
     }
 

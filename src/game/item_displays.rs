@@ -1,3 +1,5 @@
+use std::f64::consts::PI;
+
 use ab_glyph::{Font, FontRef, PxScale, ScaleFont, point};
 use bevy::{
     asset::RenderAssetUsages,
@@ -93,7 +95,7 @@ const BLANK_GLYPH: usize = 0x27;
 const FIRST_LETTER: usize = 0xd;
 const ARCADE_CELL: u32 = 16;
 const CHOMPER: u32 = 32;
-const MOUTH: f64 = 0.589_048_622_548_086_2;
+const MOUTH: f64 = 3.0 * PI / 16.0;
 
 #[derive(Component)]
 struct ScreenItem {

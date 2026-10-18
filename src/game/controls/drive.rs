@@ -29,7 +29,7 @@ pub fn drive(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, s
     let p = &mut net.players[me];
     p.zoom = (p.zoom + input.wheel as f32 * 0.125).clamp(0.0, 0.625);
     input.wheel = 0;
-    p.zoom_eased += (p.zoom - p.zoom_eased) * 0.0625;
+    p.zoom_eased += (p.zoom - p.zoom_eased) / 16.0;
     if input.right {
         p.gear_x = (p.gear_x + input.dx / 150.0).clamp(-0.125, 2.125);
         p.gear_y = (p.gear_y + input.dy / 150.0).clamp(-1.0, 1.0);
@@ -46,9 +46,9 @@ pub fn drive(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, s
     p.view_pitch = p.view_pitch.clamp(-FRAC_PI_2, FRAC_PI_2);
 
     p.forward_back = if input.held(Control::Forward) {
-        p.forward_back + 0.03125
+        p.forward_back + 1.0 / 32.0
     } else if input.held(Control::Back) {
-        p.forward_back - 0.03125
+        p.forward_back - 1.0 / 32.0
     } else if p.forward_back >= 0.125 {
         p.forward_back - 0.125
     } else if p.forward_back <= -0.125 {
@@ -84,20 +84,20 @@ pub fn drive(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, s
 fn steer(lr: f32, left: bool, right: bool) -> f32 {
     let ease = |lr: f32| {
         if right {
-            if lr < 0.721875 { lr + 0.028125 } else { 0.75 }
-        } else if lr > 0.0375 {
-            lr - 0.0375
+            if lr < 231.0 / 320.0 { lr + 9.0 / 320.0 } else { 0.75 }
+        } else if lr > 3.0 / 80.0 {
+            lr - 3.0 / 80.0
         } else {
             lr.min(0.0)
         }
     };
 
-    let push = |lr: f32| if right { lr + 0.028125 } else { lr };
+    let push = |lr: f32| if right { lr + 9.0 / 320.0 } else { lr };
 
     if left {
-        if lr > -0.721875 { ease(lr - 0.028125) } else { push(-0.75) }
-    } else if lr < -0.0375 {
-        ease(lr + 0.0375)
+        if lr > -231.0 / 320.0 { ease(lr - 9.0 / 320.0) } else { push(-0.75) }
+    } else if lr < -3.0 / 80.0 {
+        ease(lr + 3.0 / 80.0)
     } else if lr < 0.0 {
         push(0.0)
     } else {

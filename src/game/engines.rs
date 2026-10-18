@@ -18,9 +18,9 @@ const SLOTS: usize = 8;
 const RANGE: f32 = 256.0;
 const ENGINE_RADIUS: f32 = 10.0;
 const EASE: f32 = 0.125;
-const SKIDDING: f32 = 0.0625;
+const SKIDDING: f32 = 1.0 / 16.0;
 const IDLE_RPM: i32 = 0x63;
-const IDLE_PITCH: f32 = 0.298_828_13;
+const IDLE_PITCH: f32 = 153.0 / 512.0;
 
 #[derive(Resource)]
 struct EngineClips {
@@ -134,8 +134,8 @@ fn hear_engines(
         }
 
         if let Some(engine) = s.engine.as_mut() {
-            let pitch = if rpm > IDLE_RPM { rpm as f32 * 0.000_488_281_25 + 0.25 } else { IDLE_PITCH };
-            let volume = (rpm as f32 * 0.015625).min(0.5) * 0.5;
+            let pitch = if rpm > IDLE_RPM { rpm as f32 / 2048.0 + 0.25 } else { IDLE_PITCH };
+            let volume = (rpm as f32 / 64.0).min(0.5) * 0.5;
 
             s.engine_volume += (sight(front) * volume - s.engine_volume) * EASE;
 

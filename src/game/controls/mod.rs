@@ -1,4 +1,4 @@
-use std::f64::consts::{PI, TAU};
+use std::f64::consts::PI;
 
 use bevy::{platform::collections::HashSet, prelude::*};
 use bevy_enhanced_input::prelude::*;
@@ -151,8 +151,8 @@ pub(super) mod flag {
 }
 
 const PHONE_DIALLING: i32 = 1;
-const MAX_YAW: f64 = 2.748_893_571_891_25;
-const TURN: f32 = 0.001953125;
+const MAX_YAW: f64 = 7.0 * PI / 8.0;
+const TURN: f32 = 1.0 / 512.0;
 const SLOT_KEYS: [Control; 5] = [Control::Row(1), Control::Row(2), Control::Row(3), Control::Row(4), Control::Row(5)];
 const DIAL_KEYS: [Control; 20] = [
     Control::Pad(0),
@@ -395,10 +395,6 @@ fn gather<A: IsControl>(actions: Query<&TriggerState, With<Action<A>>>, mut inpu
 fn gather_movement(look: Query<&Action<Look>>, zoom: Query<&Action<Zoom>>, mut input: ResMut<InputState>) {
     input.gathered_look += look.iter().map(|a| **a).sum::<Vec2>();
     input.gathered_wheel += zoom.iter().map(|a| a.y).sum::<f32>();
-}
-
-fn angle_difference(a: f32, b: f32) -> f32 {
-    (a - b + PI as f32).rem_euclid(TAU as f32) - PI as f32
 }
 
 fn first_row(q: Quat) -> (f32, f32) {

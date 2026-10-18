@@ -92,7 +92,7 @@ fn hash_noise(x: i32, y: i32) -> f32 {
     let m = n.wrapping_mul(n).wrapping_mul(0x3d73).wrapping_add(0xc0ae5);
     let k = m.wrapping_mul(m).wrapping_add(0x5208dd0d) & 0x7fffffff;
 
-    1.0 - k as f32 * 9.313_226e-10
+    1.0 - k as f32 / 1_073_741_824.0
 }
 
 pub fn cosine_noise(mask: i32, x: f32, y: f32) -> f32 {

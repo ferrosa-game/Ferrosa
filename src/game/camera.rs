@@ -27,7 +27,7 @@ const SLOW: f32 = 0.25;
 const TURN: f32 = 1.0 / 320.0;
 const ZOOM_MIN: f32 = 2.0;
 const ZOOM_MAX: f32 = 32.0;
-const ZOOM_EASE: f32 = 0.0625;
+const ZOOM_EASE: f32 = 1.0 / 16.0;
 
 #[derive(Component)]
 pub struct GameCamera;

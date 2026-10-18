@@ -7,6 +7,7 @@ use bevy::prelude::*;
 use rand::RngExt;
 
 pub const SENSITIVITY: (i32, i32) = (10, 400);
+pub const VOICE_BOOST: (i32, i32) = (13, 400);
 
 #[derive(Resource, Clone, Debug)]
 pub struct Config {
@@ -29,8 +30,6 @@ pub struct Config {
     pub player_hair_style: i32,
     pub player_eye_color: i32,
     pub manual_hands: i32,
-
-    pub voice_gain: f32,
 }
 
 impl Config {
@@ -56,7 +55,6 @@ impl Config {
             player_hair_style: rng.random_range(0..9),
             player_eye_color: rng.random_range(0..8),
             manual_hands: 0,
-            voice_gain: 1.0,
         }
     }
 
@@ -65,7 +63,6 @@ impl Config {
         let file = std::fs::read(path).unwrap_or_default();
 
         c.visit(&mut Reader { file: &file });
-        c.derive();
 
         c
     }
@@ -80,8 +77,8 @@ impl Config {
         self.mouse_sensitivity.clamp(SENSITIVITY.0, SENSITIVITY.1) as f32 / 100.0
     }
 
-    fn derive(&mut self) {
-        self.voice_gain = (self.voice_boost as f32 / 100.0).clamp(0.125, 4.0);
+    pub fn voice_gain(&self) -> f32 {
+        self.voice_boost.clamp(VOICE_BOOST.0, VOICE_BOOST.1) as f32 / 100.0
     }
 
     fn visit(&mut self, v: &mut impl Visitor) {

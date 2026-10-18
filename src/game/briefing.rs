@@ -14,7 +14,7 @@ use super::{
 use crate::{
     fonts::GameFonts,
     menu::Screen,
-    names::{corporation_name, phone_number},
+    names::{ROUND_CORPORATIONS, corporation_name, phone_number},
 };
 
 const WHITE: [f32; 4] = [1.0; 4];
@@ -24,7 +24,6 @@ const TICKS_PER_MINUTE: u32 = 3600;
 const LUNCH: std::ops::RangeInclusive<u32> = 0x278d00..=0x278d00 + 0x34bbf;
 const MISSION_SPOTS: [&str; 8] = ["Hondo Park", "Rio Granary", "Isle of Burgers", "Park above the Kamel Building", "Bobson Dugnutt Museum", "The Mall", "Gas Station", "Red Cube Park"];
 const ROLES: [(&str, [f32; 3]); 3] = [("You are a Civilian", [0.75, 0.75, 0.75]), ("You are the Eliminator", [0.75, 0.0, 0.0]), ("You are the Protector", [0.75, 0.75, 1.0])];
-const ROUND_CORPORATIONS: [Team; 3] = [Team::Goldmen, Team::Monsota, Team::OXS];
 
 #[derive(Clone, PartialEq)]
 pub struct Line {
@@ -225,7 +224,7 @@ fn mission_lines(m: &Mission, disk: &str, place: &dyn Fn(i32) -> Option<(String,
             }
 
             add(&format!("Value:               ${} Bonus", m.value));
-            add(&format!("Estimated stock increase:         {}%", ((m.value + 1) as f32 * 0.0025) as i32));
+            add(&format!("Estimated stock increase:         {}%", ((m.value + 1) as f32 * (1.0 / 400.0)) as i32));
         }
         1 => {
             acquisition.iter().for_each(|s| add(s));

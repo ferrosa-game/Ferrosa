@@ -7,7 +7,8 @@ use bevy::{
 };
 use crate::{
     audio::AudioDevices,
-    config::{Config, SENSITIVITY, config_path},
+    config::{Config, SENSITIVITY, VOICE_BOOST, config_path},
+    keys::{key_name, mouse_button_bit, scancode},
     menu::{Screen, back_button, text},
     ui::{self, Shortcut},
 };
@@ -170,6 +171,14 @@ pub fn spawn_options(commands: &mut Commands, config: &Config, devices: &AudioDe
     commands.entity(input).observe(|v: On<ValueChange<usize>>, mut devices: ResMut<AudioDevices>| devices.chosen_input = v.value);
 
     heading(&mut commands, right, "Voice");
+    let boost = ui::slider::slider_int(&mut commands, right, "Voice Volume", config.voice_boost.clamp(VOICE_BOOST.0, VOICE_BOOST.1), VOICE_BOOST, ITEM.x);
+    commands.entity(boost).observe(|v: On<ValueChange<f32>>, mut config: ResMut<Config>| {
+        let boost = v.value.round() as i32;
+        if config.voice_boost != boost {
+            config.voice_boost = boost;
+            save(&config);
+        }
+    });
     flag(&mut commands, right, "Use Push to Talk", config, |c| &mut c.voice_hold_to_talk);
     let min_row = commands.spawn((Node::default(), VoiceMinRow, ChildOf(right))).id();
     number(&mut commands, min_row, "Voice Min", config.voice_min, (0x10, 0x4000), |c| &mut c.voice_min);
@@ -260,18 +269,6 @@ fn show_voice_settings(
     }
 }
 
-pub fn mouse_button_bit(button: MouseButton) -> Option<u32> {
-    match button {
-        MouseButton::Left => Some(0),
-        MouseButton::Middle => Some(1),
-        MouseButton::Right => Some(2),
-        MouseButton::Back => Some(3),
-        MouseButton::Forward => Some(4),
-        MouseButton::Other(n) if n < 16 => Some(n as u32),
-        MouseButton::Other(_) => None,
-    }
-}
-
 fn copy_system_info(_: On<Activate>, adapter: Option<Res<RenderAdapterInfo>>, mut clipboard: ResMut<Clipboard>) {
     let os = sysinfo::System::long_os_version().unwrap_or_else(|| std::env::consts::OS.to_string());
 
@@ -291,74 +288,5 @@ fn copy_system_info(_: On<Activate>, adapter: Option<Res<RenderAdapterInfo>>, mu
 
     if let Err(e) = clipboard.set_text(info) {
         warn!("system info not copied: {e:?}");
-    }
-}
-
-pub fn scancode(key: KeyCode) -> Option<i32> {
-    const LETTERS: [KeyCode; 26] = [
-        KeyCode::KeyA, KeyCode::KeyB, KeyCode::KeyC, KeyCode::KeyD, KeyCode::KeyE, KeyCode::KeyF, KeyCode::KeyG, KeyCode::KeyH, KeyCode::KeyI,
-        KeyCode::KeyJ, KeyCode::KeyK, KeyCode::KeyL, KeyCode::KeyM, KeyCode::KeyN, KeyCode::KeyO, KeyCode::KeyP, KeyCode::KeyQ, KeyCode::KeyR,
-        KeyCode::KeyS, KeyCode::KeyT, KeyCode::KeyU, KeyCode::KeyV, KeyCode::KeyW, KeyCode::KeyX, KeyCode::KeyY, KeyCode::KeyZ,
-    ];
-
-    const DIGITS: [KeyCode; 10] = [
-        KeyCode::Digit1, KeyCode::Digit2, KeyCode::Digit3, KeyCode::Digit4, KeyCode::Digit5, KeyCode::Digit6, KeyCode::Digit7, KeyCode::Digit8,
-        KeyCode::Digit9, KeyCode::Digit0,
-    ];
-
-    if let Some(k) = LETTERS.iter().position(|&l| l == key) {
-        return Some(4 + k as i32);
-    }
-
-    if let Some(k) = DIGITS.iter().position(|&d| d == key) {
-        return Some(30 + k as i32);
-    }
-
-    Some(match key {
-        KeyCode::Enter => 40,
-        KeyCode::Space => 44,
-        KeyCode::Comma => 54,
-        KeyCode::Period => 55,
-        KeyCode::ArrowRight => 79,
-        KeyCode::ArrowLeft => 80,
-        KeyCode::ArrowDown => 81,
-        KeyCode::ArrowUp => 82,
-        KeyCode::Numpad7 => 95,
-        KeyCode::ControlLeft => 224,
-        KeyCode::ShiftLeft => 225,
-        KeyCode::AltLeft => 226,
-        _ => return None,
-    })
-}
-
-fn key_name(scancode: i32) -> &'static str {
-    const LETTERS: [&str; 26] = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"];
-    const DIGITS: [&str; 10] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
-
-    match scancode {
-        0 => "None",
-        4..=29 => LETTERS[(scancode - 4) as usize],
-        30..=39 => DIGITS[(scancode - 30) as usize],
-        40 => "Enter",
-        44 => "Space",
-        54 => "Comma",
-        55 => "Period",
-        79 => "Right",
-        80 => "Left",
-        81 => "Down",
-        82 => "Up",
-        95 => "Home",
-        224 => "Ctrl",
-        225 => "Shift",
-        226 => "Alt",
-        256 => "Ins",
-        257 => "End",
-        259 => "PgDn",
-        261 => "Center",
-        265 => "PgUp",
-        266 => "Del",
-        269 => "Minus",
-        270 => "Plus",
-        _ => "",
     }
 }

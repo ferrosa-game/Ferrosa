@@ -18,7 +18,7 @@ use super::{
     items::ItemTypes,
     netgame::NetGame,
 };
-use crate::{fonts::GameFonts, menu::Screen, names::TEAM_COLOURS};
+use crate::{fonts::GameFonts, menu::Screen, names::{ROUND_CORPORATIONS, TEAM_COLOURS}};
 
 const ROUND_ORIGIN: Vec2 = Vec2::new(960.0, 896.0);
 const CITY_ORIGIN: Vec2 = Vec2::new(896.0, 896.0);
@@ -67,7 +67,6 @@ const BANK_SIZES: (f32, f32) = (12.0, 22.0);
 const BASE: i32 = 1;
 const BANK: i32 = 6;
 const DROP_MISSION: i32 = 2;
-const ROUND_CORPORATIONS: usize = 3;
 const SIDE_STREETS: i32 = 0x140;
 const AVENUE_START: i32 = 0x100;
 const AVENUE_BLOCK: i32 = 0x38;
@@ -227,7 +226,7 @@ fn legend(net: &NetGame) -> Vec<(Option<[f32; 4]>, String)> {
         }
         GameMode::Eliminator => rows.push((Some(SPOT_COLOUR), "Mission spot".to_string())),
         _ => {
-            for (k, name) in Team::CORPORATION_NAMES.iter().take(ROUND_CORPORATIONS).enumerate() {
+            for (k, name) in Team::CORPORATION_NAMES.iter().take(ROUND_CORPORATIONS.len()).enumerate() {
                 let [r, g, b] = TEAM_COLOURS[k];
                 let own = team == Team::CORPORATIONS.get(k).copied();
                 rows.push((Some([r, g, b, 1.0]), if own { format!("{name} base (yours)") } else { format!("{name} base") }));
@@ -422,7 +421,7 @@ fn marks(net: &NetGame, picture: &MapPicture, level: &Level) -> Vec<Mark> {
             }
         }
         mode @ (GameMode::Round | GameMode::Eliminator) => {
-            for i in 0..ROUND_CORPORATIONS {
+            for i in 0..ROUND_CORPORATIONS.len() {
                 let Some(at) = base(i) else { continue };
 
                 out.push(Mark { at, radius: 16.0, colour: if mode == GameMode::Round { team_colour(i) } else { [1.0; 4] } });

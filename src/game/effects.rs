@@ -28,21 +28,21 @@ use crate::menu::Screen;
 const MAX_PARTICLES: usize = 0x4000;
 const MAX_PIECES: usize = 0x4000;
 const FOREVER: i32 = 0xffff;
-const GRAVITY: f32 = 0.002_722_222_3;
-const DRAG: f32 = 0.9975;
+const GRAVITY: f32 = 9.8 / 60.0 / 60.0;
+const DRAG: f32 = 399.0 / 400.0;
 const SMOKE_DRAG: f32 = 0.975;
 const SMOKE_LIFE: i32 = 0x3c;
 const PANE_LIFE: i32 = 0xea60;
 const SETTLING: i32 = 0xe808;
-const LIFT: f32 = 0.015625;
-const RESTING_LIFT: f32 = 0.001_953_125;
-const SHARD_SIZE: f32 = 0.0625;
+const LIFT: f32 = 1.0 / 64.0;
+const RESTING_LIFT: f32 = 1.0 / 512.0;
+const SHARD_SIZE: f32 = 1.0 / 16.0;
 const SHARD_GRID: usize = 9;
 const UPRIGHT: f32 = 0.707;
 const FLOOR: f32 = 0.7;
-const STILL: f32 = 0.008_333_334;
-const CLINK: f32 = 0.016_666_668;
-const MIN_SPIN: f32 = 1.525_878_9e-5;
+const STILL: f32 = 1.0 / 120.0;
+const CLINK: f32 = 1.0 / 60.0;
+const MIN_SPIN: f32 = 1.0 / 65536.0;
 const RICOCHET: i32 = 0;
 const BODY: i32 = 1;
 const METAL: i32 = 2;
@@ -141,13 +141,12 @@ impl Plugin for EffectsPlugin {
     }
 }
 
-fn empty_mesh() -> Mesh {
-    Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
-        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vec![[0.0f32; 3]; 3])
-        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0, 1.0, 0.0f32]; 3])
-        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0f32; 2]; 3])
-        .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, vec![[0.0f32; 4]; 3])
-        .with_inserted_indices(Indices::U32(vec![0, 1, 2]))
+pub fn empty_mesh(topology: PrimitiveTopology, vertices: usize) -> Mesh {
+    Mesh::new(topology, RenderAssetUsages::default())
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vec![[0.0f32; 3]; vertices])
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0, 1.0, 0.0f32]; vertices])
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0f32; 2]; vertices])
+        .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, vec![[0.0f32; 4]; vertices])
 }
 
 fn spawn_effect_assets(mut commands: Commands, assets: Res<AssetServer>, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, mut images: ResMut<Assets<Image>>) {
@@ -159,9 +158,9 @@ fn spawn_effect_assets(mut commands: Commands, assets: Res<AssetServer>, mut mes
     let mut spot = textures::particle().into_image();
     spot.sampler = ImageSampler::linear();
 
-    let spots = meshes.add(empty_mesh());
-    let blood = meshes.add(empty_mesh());
-    let glass = meshes.add(empty_mesh());
+    let spots = meshes.add(empty_mesh(PrimitiveTopology::TriangleList, 3));
+    let blood = meshes.add(empty_mesh(PrimitiveTopology::TriangleList, 3));
+    let glass = meshes.add(empty_mesh(PrimitiveTopology::TriangleList, 3));
     let spot_image = images.add(spot);
     let spot_material = StandardMaterial { base_color: Color::WHITE, base_color_texture: Some(spot_image.clone()), unlit: true, alpha_mode: AlphaMode::Blend, cull_mode: None, ..default() };
     let blood_material = StandardMaterial { base_color: BLOOD_SHADE, base_color_texture: Some(spot_image), perceptual_roughness: 1.0, alpha_mode: AlphaMode::Blend, cull_mode: None, ..default() };
@@ -215,7 +214,7 @@ fn piece_bounce(vel: Vec3, n: Vec3) -> Vec3 {
         along = along.normalize_or_zero() * d.abs() * 0.7;
     }
 
-    (vel - n * d * 1.25 - along) * 0.9375
+    (vel - n * d * 1.25 - along) * 15.0 / 16.0
 }
 
 fn spin_axes(axes: &mut [Vec3; 3], axis: Vec3, angle: f32) {
@@ -240,14 +239,14 @@ fn shatter_window(particles: &mut Particles, c: [Vec3; 4], hit: Vec3, hit_vel: V
         let mut p = start;
 
         for _ in 0..SHARD_GRID {
-            let near = (1.0 - p.distance(hit) * 4.0).max(0.03125);
-            let vel = (p - hit) * 0.03125 + random_vec3(0.008_333_334, 0.002_083_333_4) + hit_vel * near * 0.0625;
+            let near = (1.0 - p.distance(hit) * 4.0).max(1.0 / 32.0);
+            let vel = (p - hit) / 32.0 + random_vec3(1.0 / 120.0, 1.0 / 480.0) + hit_vel * near / 16.0;
             let mut s = Particle::new(Kind::Shard, p, vel);
 
             s.size = SHARD_SIZE;
             s.frame = [side, up, n];
-            s.spin_axis = Vec3::new(byte() * 0.001_953_125 - 0.25, byte() * 0.001_953_125 - 0.25, byte() * 0.001_953_125 - 0.25).normalize_or_zero();
-            s.spin = (byte() * 0.001_953_125 - 0.25) * 0.5;
+            s.spin_axis = Vec3::new(byte() / 512.0 - 0.25, byte() / 512.0 - 0.25, byte() / 512.0 - 0.25).normalize_or_zero();
+            s.spin = (byte() / 512.0 - 0.25) * 0.5;
             particles.add(s);
             p += step;
         }
@@ -273,11 +272,11 @@ fn break_pane(particles: &mut Particles, level: &mut Level, cell: IVec3, face: i
         let c = [at(w[3]), at(w[2]), at(w[1]), at(w[0])];
 
         for k in 0..4 {
-            let tip = if k == 2 { hit - Vec3::Y * 0.0625 } else { hit };
+            let tip = if k == 2 { hit - Vec3::Y / 16.0 } else { hit };
             let mut t = Particle::new(Kind::Triangle, Vec3::ZERO, Vec3::ZERO);
 
             t.frame = [c[k], c[(k + 1) & 3], tip];
-            t.corner_vel = [Vec3::ZERO, Vec3::ZERO, hit_vel * 0.015625];
+            t.corner_vel = [Vec3::ZERO, Vec3::ZERO, hit_vel / 64.0];
             t.life = PANE_LIFE;
             t.rest = [t.frame[0].distance(t.frame[1]), t.frame[1].distance(t.frame[2]), t.frame[2].distance(t.frame[0])];
             particles.add(t);
@@ -310,8 +309,8 @@ fn emit_effects(
 
     let fresh: Vec<NetEvent> = happenings.read().cloned().collect();
     let Some(mut level) = level else { return };
-    let small = || (rand::random::<u32>() & 0x1f) as f32 * 0.000_244_140_63 + 0.015625;
-    let blood = || (rand::random::<u32>() & 0x3f) as f32 * 0.000_976_562_5 + 0.0625;
+    let small = || (rand::random::<u32>() & 0x1f) as f32 / 4096.0 + 1.0 / 64.0;
+    let blood = || (rand::random::<u32>() & 0x3f) as f32 / 1024.0 + 1.0 / 16.0;
     let mut spawn_piece = |particles: &mut Particles, kind: PieceKind, pos: Vec3, vel: Vec3, axes: [Vec3; 3]| {
         if particles.pieces >= MAX_PIECES {
             return;
@@ -339,33 +338,33 @@ fn emit_effects(
                 let Some(it) = usize::try_from(item).ok().and_then(|i| net.items.get(i)) else { continue };
                 let turn = it.rot.conjugate();
                 let axes = [turn * Vec3::X, turn * Vec3::Y, turn * Vec3::Z];
-                let vel = (axes[0] + axes[1]) * 0.025 + random_vec3(0.016_666_668, 0.0);
+                let vel = (axes[0] + axes[1]) * 0.025 + random_vec3(1.0 / 60.0, 0.0);
 
                 spawn_piece(&mut particles, PieceKind::Case, pos, vel, axes);
             }
             NetEvent::BulletHit { hit: RICOCHET, pos, normal } => {
                 for _ in 0..3 {
-                    spawn_piece(&mut particles, PieceKind::Chip, pos, normal * 0.016_666_668 + random_vec3(0.05, 0.0), [Vec3::X, Vec3::Y, Vec3::Z]);
+                    spawn_piece(&mut particles, PieceKind::Chip, pos, normal * (1.0 / 60.0) + random_vec3(0.05, 0.0), [Vec3::X, Vec3::Y, Vec3::Z]);
                 }
             }
             NetEvent::BulletHit { hit: hit @ (BODY | GRAZE), pos, .. } => {
                 for _ in 0..if hit == BODY { 16 } else { 4 } {
                     let size = blood();
-                    let mut p = Particle::new(Kind::Blood, pos, random_vec3(0.033_333_335, 0.008_333_334));
+                    let mut p = Particle::new(Kind::Blood, pos, random_vec3(1.0 / 30.0, 1.0 / 120.0));
                     p.size = size * 0.25;
                     particles.add(p);
                 }
             }
             NetEvent::BulletHit { hit: METAL, pos, .. } => {
                 for _ in 0..8 {
-                    let mut p = Particle::new(Kind::Smoke, pos, random_vec3(0.033_333_335, 0.008_333_334));
+                    let mut p = Particle::new(Kind::Smoke, pos, random_vec3(1.0 / 30.0, 1.0 / 120.0));
                     (p.life, p.size, p.drag) = (SMOKE_LIFE, small(), SMOKE_DRAG);
                     particles.add(p);
                 }
             }
             NetEvent::Explosion { pos } => {
                 for _ in 0..0x80 {
-                    let mut p = Particle::new(Kind::Smoke, pos, random_vec3(0.066_666_67, 0.333_333_34));
+                    let mut p = Particle::new(Kind::Smoke, pos, random_vec3(1.0 / 15.0, 1.0 / 3.0));
                     (p.life, p.size, p.drag) = (SMOKE_LIFE, small(), SMOKE_DRAG);
                     particles.add(p);
                 }
@@ -449,7 +448,7 @@ fn simulate_effects(mut net: ResMut<NetGame>, level: Option<Res<Level>>, mut par
 
             if let Some((at, n)) = trace(map, old, p.pos) {
                 p.pos = at + n * LIFT;
-                p.vel = bounce(p.vel, n, 0.9375);
+                p.vel = bounce(p.vel, n, 15.0 / 16.0);
             }
 
             continue;
@@ -472,7 +471,7 @@ fn simulate_effects(mut net: ResMut<NetGame>, level: Option<Res<Level>>, mut par
         let old = p.pos;
         p.pos += p.vel;
 
-        if p.kind == Kind::Shard && p.spin > 0.004_166_667 {
+        if p.kind == Kind::Shard && p.spin > 1.0 / 240.0 {
             spin_axes(&mut p.frame, p.spin_axis, p.spin);
         }
 
@@ -483,7 +482,7 @@ fn simulate_effects(mut net: ResMut<NetGame>, level: Option<Res<Level>>, mut par
             }
             Some((at, n)) => {
                 p.pos = at + n * LIFT;
-                p.vel = bounce(p.vel, n, 0.9375);
+                p.vel = bounce(p.vel, n, 15.0 / 16.0);
             }
             None => {}
         }
@@ -516,7 +515,7 @@ fn simulate_effects(mut net: ResMut<NetGame>, level: Option<Res<Level>>, mut par
             let into = n.dot(hit);
 
             if piece.kind == PieceKind::Case && into < -CLINK {
-                let pitch = (rand::random::<u32>() & 0x7f) as f32 * 0.000_976_562_5 + 1.0;
+                let pitch = (rand::random::<u32>() & 0x7f) as f32 / 1024.0 + 1.0;
                 net.happenings.push(NetEvent::ShellHit { pos: piece.pos, volume: -into * 0.125 * 0.5 * 60.0, pitch });
             }
 
@@ -578,7 +577,7 @@ impl Batch {
 
     fn write(self, mesh: &mut Mesh) {
         if self.indices.is_empty() {
-            *mesh = empty_mesh();
+            *mesh = empty_mesh(PrimitiveTopology::TriangleList, 3);
             return;
         }
 
@@ -609,7 +608,7 @@ fn draw_particles(particles: Res<Particles>, effect_assets: Res<EffectAssets>, c
     let (mut spots, mut blood, mut glass) = (Batch::default(), Batch::default(), Batch::default());
 
     for p in &particles.list {
-        let fade = (p.life as f32 * 0.03125).min(1.0);
+        let fade = (p.life as f32 / 32.0).min(1.0);
         let corners = |side: Vec3, up: Vec3, s: f32| [p.pos - side * s + up * s, p.pos + side * s + up * s, p.pos + side * s - up * s, p.pos - side * s - up * s];
 
         match p.kind {

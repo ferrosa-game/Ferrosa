@@ -2,7 +2,7 @@ use std::{f64::consts::{PI, TAU}, f64::consts::FRAC_PI_2};
 
 use ferrosa_protocol::clientbound::game::ItemKind;
 
-use crate::game::{controls::{Control, InputState, MAX_YAW, Settings, TURN, angle_difference, dialling, first_row, flag, inventory_input, item_kind, number_keys, scroll_actions, slot_item}, netgame::{NetGame, entities::Player}};
+use crate::game::{angles::angle_difference, controls::{Control, InputState, MAX_YAW, Settings, TURN, dialling, first_row, flag, inventory_input, item_kind, number_keys, scroll_actions, slot_item}, netgame::{NetGame, entities::Player}};
 
 pub fn walk(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, settings: &Settings) {
     let (body_pitch, body_yaw) = net.own_human.as_ref().map_or((0.0, 0.0), |o| (o.view_pitch, o.body_yaw));
@@ -43,16 +43,16 @@ pub fn walk(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, se
 
     input.wheel = 0;
 
-    p.zoom = [0.0, 0.0625, 0.5][p.zoom_level as usize];
-    p.zoom_eased += (p.zoom - p.zoom_eased) * 0.0625;
+    p.zoom = [0.0, 1.0 / 16.0, 0.5][p.zoom_level as usize];
+    p.zoom_eased += (p.zoom - p.zoom_eased) / 16.0;
 
     let slow = 1.0 - p.zoom_eased;
     let dx = slow * input.dx;
     let turn = dx * TURN;
     let tilt = if settings.invert { -1.0 } else { 1.0 } * slow * input.dy * TURN;
 
-    p.spin_yaw = (p.spin_yaw + turn * 0.5) * 0.9375;
-    p.view_pitch_delta = (p.view_pitch_delta + tilt * 0.5) * 0.9375;
+    p.spin_yaw = (p.spin_yaw + turn * 0.5) * 15.0 / 16.0;
+    p.view_pitch_delta = (p.view_pitch_delta + tilt * 0.5) * 15.0 / 16.0;
 
     let follow = |p: &mut Player| {
         let behind = angle_difference(body_yaw, p.view_yaw);
@@ -69,7 +69,7 @@ pub fn walk(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, se
         p.input_flags |= flag::MANUAL;
     } else if in_hand >= 0 && input.aim {
         let behind = follow(p);
-        p.view_yaw_delta = ((p.view_yaw_delta - behind) as f64 + PI).rem_euclid(TAU) as f32 - PI as f32 + dx * 0.00048828125;
+        p.view_yaw_delta = ((p.view_yaw_delta - behind) as f64 + PI).rem_euclid(TAU) as f32 - PI as f32 + dx / 2048.0;
 
         view_pitch(p, input, settings);
 
@@ -135,7 +135,7 @@ fn view_pitch(p: &mut Player, input: &InputState, settings: &Settings) {
     p.aim_pitch[0] = p.aim_pitch[0].clamp(-FRAC_PI_2 as f32, FRAC_PI_2 as f32);
 
     let (target, eased, speed) = (p.aim_pitch[0], p.aim_pitch[1], p.aim_pitch[2]);
-    let d = ((target - eased) * 0.125).clamp(-0.03125, 0.03125);
+    let d = ((target - eased) * 0.125).clamp(-1.0 / 32.0, 1.0 / 32.0);
 
     p.aim_pitch[2] = d - speed * 0.25 + speed;
     p.aim_pitch[1] = p.aim_pitch[2] + eased;
@@ -144,7 +144,7 @@ fn view_pitch(p: &mut Player, input: &InputState, settings: &Settings) {
 
 fn swing_door(net: &mut NetGame, me: usize, item: i32, input: &InputState) {
     let view_yaw = net.own_human.as_ref().map_or(0.0, |o| o.view_yaw);
-    let (x, y) = (1.25 * input.dx * 0.0009765625, 1.25 * input.dy * 0.0009765625);
+    let (x, y) = (1.25 * input.dx / 1024.0, 1.25 * input.dy / 1024.0);
     let p = &mut net.players[me];
     let (gs, gc) = p.gear_x.sin_cos();
     let (vs, vc) = view_yaw.sin_cos();

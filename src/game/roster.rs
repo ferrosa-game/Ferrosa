@@ -14,7 +14,7 @@ use super::{
 use crate::{
     fonts::GameFonts,
     menu::Screen,
-    names::{TEAM_COLOURS, corporation_index, phone_number},
+    names::{ROUND_CORPORATIONS, SHORT_NAMES, TEAM_COLOURS, corporation_index, phone_number},
     ui::{self, Shortcut},
 };
 
@@ -23,7 +23,6 @@ const WIDE_COLUMN: f32 = 340.0;
 const COLUMNS_AT: Vec2 = Vec2::new(8.0, 80.0);
 const KEY: KeyCode = KeyCode::KeyH;
 const WATCHING: [f32; 3] = [1.0; 3];
-const ROUND_CORPORATIONS: [Team; 3] = [Team::Goldmen, Team::Monsota, Team::OXS];
 const DAYS: [&str; 7] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const LAST_DAY: u32 = 5;
 const OBSERVER: i32 = 4;
@@ -93,7 +92,7 @@ fn roster(net: &NetGame) -> View {
     let day = net.sync.weekly.then(|| DAYS.get(net.sync.weekday as usize).map(|d| d.to_string())).flatten();
     let winner = (net.sync.weekly && state == GameState::Restarting && net.sync.weekday == LAST_DAY).then(|| {
         let best = (0..3).fold(0, |best, t| if prices[t] > prices[best] { t } else { best });
-        (format!("{} Wins!", ["Goldmen", "Monsota", "OXS"][best]), TEAM_COLOURS[best])
+        (format!("{} Wins!", SHORT_NAMES[best]), TEAM_COLOURS[best])
     });
 
     let columns = (0..4)
@@ -119,7 +118,7 @@ fn roster(net: &NetGame) -> View {
 
             match team {
                 Some(_) if joining && watching => {
-                    items.push(Item::Button { label: format!("Join {}", ["Goldmen", "Monsota", "OXS"][column]), choice: column as i32 + 1, key: JOIN_KEYS[column] });
+                    items.push(Item::Button { label: format!("Join {}", SHORT_NAMES[column]), choice: column as i32 + 1, key: JOIN_KEYS[column] });
                 }
                 None if joining && !watching => items.push(Item::Button { label: "Observer".to_string(), choice: OBSERVER, key: KeyCode::Digit4 }),
                 _ => {}

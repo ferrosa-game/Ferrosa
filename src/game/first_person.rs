@@ -1,9 +1,8 @@
-use std::f32::consts::{PI, TAU};
-
 use bevy::prelude::*;
 use ferrosa_world::skeleton::BoneId;
 
 use super::{
+    angles::{angle_difference, wrap_angle},
     camera::GameCamera,
     human_sync::{NetHuman, bone_at, pose},
     netgame::{entities::Human, NetGame},
@@ -13,7 +12,7 @@ use super::{
 use crate::character_model::{HideHead, HumanPose};
 
 const CAMERA_TURN: f32 = 0.125;
-const MIN_TURN: f32 = 1.525_878_9e-5;
+const MIN_TURN: f32 = 1.0 / 65536.0;
 const DEATH_VIEW: f32 = 3.0;
 
 #[derive(Resource)]
@@ -57,23 +56,6 @@ fn turn_between(from: Quat, to: Quat) -> Vec3 {
     if d.w < 0.0 { (-d).to_scaled_axis() } else { d.to_scaled_axis() }
 }
 
-fn wrap(a: f32) -> f32 {
-    if a < -PI {
-        a + TAU
-    } else if a > PI {
-        a - TAU
-    } else {
-        a
-    }
-}
-
-fn angle_difference(a: f32, b: f32) -> f32 {
-    let a = if b - a >= PI { a + TAU } else { a };
-    let b = if a - b >= PI { b + TAU } else { b };
-
-    a - b
-}
-
 fn follow_head(mut fp: ResMut<FirstPerson>, net: Res<NetGame>) {
     let human = net.me().map_or(-1, |p| p.human);
     let (Some(p), Some(h), Some(own)) = (net.me(), usize::try_from(human).ok().and_then(|h| net.humans.get(h)), net.own_human.as_ref()) else {
@@ -89,7 +71,7 @@ fn follow_head(mut fp: ResMut<FirstPerson>, net: Res<NetGame>) {
 
     let last = fp.rot;
     let on_foot = h.vehicle < 0;
-    let yaw = wrap(p.view_yaw_delta - angle_difference(own.body_yaw, p.view_yaw));
+    let yaw = wrap_angle(p.view_yaw_delta - angle_difference(own.body_yaw, p.view_yaw));
 
     let target = if on_foot {
         head_rot * Quat::from_rotation_y(own.yaw_offset - yaw)
@@ -183,5 +165,5 @@ fn change_view_width(net: Option<Res<NetGame>>, fp: Res<FirstPerson>, mut projec
     let Projection::Perspective(p) = &mut **projection else { return };
     let zoom = net.as_deref().filter(|n| own_human(n, &fp).is_some()).and_then(|n| n.me()).map_or(0.0, |p| p.zoom_eased);
 
-    p.fov = 2.0 * (0.5625 * (1.0 - zoom)).atan();
+    p.fov = 2.0 * (9.0 / 16.0 * (1.0 - zoom)).atan();
 }

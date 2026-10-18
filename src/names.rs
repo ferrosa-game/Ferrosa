@@ -3,6 +3,9 @@ use ferrosa_protocol::Team;
 pub const TEAM_COLOURS: [[f32; 3]; 8] =
     [[0.75, 0.5625, 0.1875], [0.1875, 0.375, 0.5625], [0.25, 0.25, 0.25], [0.5625, 0.1875, 0.1875], [0.875, 0.875, 0.875], [0.125, 0.5, 0.125], [0.75, 0.75, 0.75], [0.25, 0.25, 0.25]];
 
+pub const ROUND_CORPORATIONS: [Team; 3] = [Team::Goldmen, Team::Monsota, Team::OXS];
+pub const SHORT_NAMES: [&str; 3] = ["Goldmen", "Monsota", "OXS"];
+
 pub fn phone_number(number: u32) -> String {
     format!("{:03}-{:04}", number / 10000, number % 10000)
 }

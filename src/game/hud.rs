@@ -34,7 +34,6 @@ const IN_USE: i32 = 3;
 const BUSY: i32 = 4;
 const GEAR_LABELS: [(&str, f32, f32); 6] = [("1", 818.0, 420.0), ("2", 818.0, 476.0), ("3", 850.0, 420.0), ("4", 850.0, 476.0), ("A", 882.0, 420.0), ("R", 882.0, 476.0)];
 const AIM_PIVOT: Vec2 = Vec2::new(608.0, 352.0);
-const AIM_LIMITS: [Vec2; 2] = [Vec2::new(578.435_85, 327.508_27), Vec2::new(578.435_85, 376.491_73)];
 const AIM_NEEDLE: f32 = 64.0;
 const CORPORATION_MENUS: std::ops::RangeInclusive<i32> = 0xe..=0x1a;
 const TIMER_AT: Vec2 = Vec2::new(1020.0, 4.0);
@@ -527,20 +526,19 @@ fn show_crosshair(net: Res<NetGame>, types: Res<ItemTypes>, mut dot: Query<&mut 
 
 fn show_aim(net: Res<NetGame>, input: Res<InputState>, mut lines: Query<(&AimLine, &mut Node, &mut UiTransform, &mut Visibility)>) {
     let pitch = own(&net).filter(|_| net.game_state != GameState::Restarting && input.aiming()).map(|(p, _, _)| p.free_look_pitch);
-    let tip = |pitch: f32, scale: f32| {
-        let a = 15.0 * pitch * scale;
-        AIM_PIVOT + Vec2::new(-a.cos() * AIM_NEEDLE * 0.5, a.sin() * AIM_NEEDLE)
-    };
+    let needle = |a: f32| AIM_PIVOT + Vec2::new(-a.cos() * AIM_NEEDLE * 0.5, a.sin() * AIM_NEEDLE);
+    let tip = |pitch: f32, scale: f32| needle(15.0 * pitch * scale);
 
     for (&AimLine(k), mut node, mut turn, mut v) in &mut lines {
         shown(&mut v, pitch.is_some());
 
         let Some(pitch) = pitch else { continue };
         let (a, b) = match k {
-            0 | 1 => (AIM_PIVOT, AIM_LIMITS[k]),
+            0 => (AIM_PIVOT, needle(-PI / 8.0)),
+            1 => (AIM_PIVOT, needle(PI / 8.0)),
             2 => (AIM_PIVOT, tip(pitch, 1.0)),
-            3 => (tip(pitch, 1.0), tip(pitch, 0.9375)),
-            _ => (tip(pitch, 0.9375), tip(pitch, 0.875)),
+            3 => (tip(pitch, 1.0), tip(pitch, 15.0 / 16.0)),
+            _ => (tip(pitch, 15.0 / 16.0), tip(pitch, 0.875)),
         };
 
         (*node, *turn) = line(a, b, 1.0, false);

@@ -18,6 +18,7 @@ mod check_for_updates;
 mod audio;
 mod config;
 mod fonts;
+mod keys;
 mod game;
 mod character_model;
 mod masterserver;

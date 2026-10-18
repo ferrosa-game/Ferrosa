@@ -24,10 +24,10 @@ use crate::{character_model::HumanPose, menu::Screen};
 const FIRST_POCKET: u32 = 2;
 const BACK: f32 = 0.25;
 const NOTES: [&str; 7] = ["one", "five", "ten", "twenty", "fifty", "hundred", "thousand"];
-const BILL_GAP: f32 = 0.013_671_875;
-const FAN: f32 = 0.031_25;
+const BILL_GAP: f32 = 7.0 / 512.0;
+const FAN: f32 = 1.0 / 32.0;
 const FACE: &str = "skin";
-const FACE_SHIFT: f32 = 0.1875;
+const FACE_SHIFT: f32 = 3.0 / 16.0;
 const OTHER_FACE: i32 = 1;
 const REACH: f32 = 1.5;
 
