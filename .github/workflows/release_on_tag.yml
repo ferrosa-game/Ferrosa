@@ -39,6 +39,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: new_client
+          submodules: true
+          lfs: true
+          token: ${{ secrets.SERVER_REPO_TOKEN || github.token }}
 
       - uses: actions/checkout@v4
         with:
@@ -75,6 +78,7 @@ jobs:
           cp "$release/${{ matrix.bin }}" "$staging/"
           cp "$steam" "$staging/"
           cp -r data "$staging/"
+          find "$staging/data" -mindepth 1 -name '.*' -exec rm -rf {} +
 
           if [ "$RUNNER_OS" = "Windows" ]; then
             (cd "$staging" && 7z a "../$staging.zip" .)
