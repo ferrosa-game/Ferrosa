@@ -50,6 +50,7 @@ impl Plugin for EscapeMenuPlugin {
             .add_systems(Update, open_on_escape.run_if(|menu: Option<Res<State<GameMenu>>>| menu.is_some_and(|m| matches!(m.get(), GameMenu::Closed | GameMenu::PlayerMenu))))
             .add_systems(OnEnter(GameMenu::Open), spawn_menu)
             .add_systems(OnEnter(GameMenu::Options), spawn_options_page)
+            .add_systems(OnEnter(Screen::Main), |mut commands: Commands| commands.remove_resource::<NetGame>())
             .add_observer(on_button);
     }
 }
@@ -110,7 +111,6 @@ fn spawn_options_page(mut commands: Commands, config: Res<Config>, devices: Res<
 fn on_button(
     activate: On<Activate>,
     buttons: Query<&MenuButton>,
-    mut commands: Commands,
     net: Option<Res<NetGame>>,
     mut socket: ResMut<ClientSocket>,
     mut menu: ResMut<NextState<GameMenu>>,
@@ -127,7 +127,6 @@ fn on_button(
         MenuButton::ExitGame => {
             if let Some(net) = net {
                 net.leave(&mut socket);
-                commands.remove_resource::<NetGame>();
             }
 
             screen.set(Screen::Main);
