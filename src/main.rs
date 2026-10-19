@@ -14,45 +14,50 @@ use bevy::{
 
 use crate::check_for_updates::{handle_update_task, spawn_update_check};
 
-mod check_for_updates;
 mod audio;
+mod character_model;
+mod check_for_updates;
 mod config;
 mod fonts;
-mod keys;
 mod game;
-mod character_model;
+mod keys;
 mod masterserver;
-mod names;
 mod menu;
+mod names;
 mod net;
+mod rich_presence;
 mod steam;
 mod ui;
-mod rich_presence;
 
 fn main() {
-    App::new()
-        .add_plugins(
-            DefaultPlugins
-                .set(WindowPlugin { primary_window: Some(Window { title: "Ferrosa".into(), ..default() }), ..default() })
-                .set(AssetPlugin { file_path: "data".into(), ..default() })
-                .set(RenderPlugin { render_creation: render_settings().into(), ..default() }),
-        )
-        .insert_resource(ClearColor(menu::MENU_BACKGROUND))
-        .add_plugins((config::ConfigPlugin, fonts::FontsPlugin, audio::DevicesPlugin))
-        .add_plugins((
-            masterserver::MasterServerPlugin,
-            ui::UiPlugin,
-            menu::MenuPlugin,
-            character_model::HumanPlugin,
-            game::GamePlugin,
-            rich_presence::RichPresencePlugin,
-        ))
-        .add_systems(Startup, spawn_update_check)
-        .add_systems(Startup, |mut commands: Commands| {
-            commands.spawn((Camera2d, IsDefaultUiCamera));
-        })
-        .add_systems(Update, (set_window_icon, handle_update_task))
-        .run();
+    let mut app = App::new();
+
+    app.add_plugins(
+        DefaultPlugins
+            .set(WindowPlugin { primary_window: Some(Window { title: "Ferrosa".into(), ..default() }), ..default() })
+            .set(AssetPlugin { file_path: "data".into(), ..default() })
+            .set(RenderPlugin { render_creation: render_settings().into(), ..default() }),
+    )
+    .insert_resource(ClearColor(menu::MENU_BACKGROUND))
+    .add_plugins((config::ConfigPlugin, fonts::FontsPlugin, audio::DevicesPlugin))
+    .add_plugins((
+        masterserver::MasterServerPlugin,
+        ui::UiPlugin,
+        menu::MenuPlugin,
+        character_model::HumanPlugin,
+        game::GamePlugin,
+        rich_presence::RichPresencePlugin,
+    ))
+    .add_systems(Startup, spawn_update_check)
+    .add_systems(Startup, |mut commands: Commands| {
+        commands.spawn((Camera2d, IsDefaultUiCamera));
+    })
+    .add_systems(Update, handle_update_task);
+
+    #[cfg(windows)]
+    app.add_systems(Update, set_window_icon);
+
+    app.run();
 }
 
 fn render_settings() -> WgpuSettings {

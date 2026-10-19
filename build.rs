@@ -42,8 +42,9 @@ fn main() {
         }
 
         set_windows_icon();
-        get_git_hash();
     }
+
+    get_git_hash();
 
     println!("cargo:rerun-if-changed=build.rs");
 }
