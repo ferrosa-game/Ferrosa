@@ -24,7 +24,7 @@ that you want, feel free to make a pull request!
 
 ## Running
 
-**The simplest way is to download it from our latest release for your platform! [Here. Or on the right.](https://github.com/ferosa-game/Ferrosa/releases/latest)**
+**The simplest way is to download it from our latest release for your platform! [Here. Or on the right.](https://github.com/ferrosa-game/Ferrosa/releases/latest)**
 
 The only thing you need installed is the [Rust toolchain](https://rustup.rs/).
 
