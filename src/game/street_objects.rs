@@ -1,7 +1,6 @@
 use ab_glyph::{Font, FontRef, PxScale, ScaleFont, point};
 use bevy::{
     asset::RenderAssetUsages,
-    camera::Exposure,
     gltf::{GltfAssetLabel, GltfMaterialName},
     image::ImageSampler,
     prelude::*,
@@ -12,8 +11,8 @@ use ferrosa_world::{
     streets::StreetMap,
 };
 
-use super::{Level, camera::EXPOSURE, netgame::NetGame};
-use crate::{fonts::OVERPASS, menu::Screen};
+use super::{Level, netgame::NetGame};
+use crate::{config::Config, fonts::OVERPASS, game::camera, menu::Screen};
 
 const TRAFFIC_LIGHT: usize = 1;
 const SIGN: usize = 4;
@@ -22,7 +21,6 @@ const SIGN_MODEL: &str = "models/objects/object_4.glb";
 const LAMP: &str = "lamp";
 const SIGN_FACE: &str = "sign";
 const LIGHTS: [&str; 3] = ["light_red", "light_amber", "light_green"];
-const LAMP_GLOW: f32 = 0.1;
 const AMBER: i32 = 1;
 const GREEN: i32 = 2;
 const STREET_NAMES: [&str; 17] = [
@@ -72,6 +70,7 @@ impl Plugin for StreetObjectsPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(Screen::InGame), spawn_street_objects)
             .add_systems(Update, (mark_faces, light_lamps.run_if(resource_exists::<NetGame>)).chain().run_if(in_state(Screen::InGame)).run_if(resource_exists::<StreetMaterials>))
+            .add_systems(Update, change_glow.run_if(resource_changed::<Config>).run_if(resource_exists::<StreetMaterials>))
             .add_systems(OnExit(Screen::InGame), |mut commands: Commands| commands.remove_resource::<StreetMaterials>());
     }
 }
@@ -138,8 +137,21 @@ fn sign_image(font: &FontRef, name: &str) -> Image {
     image
 }
 
-fn spawn_street_objects(mut commands: Commands, assets: Res<AssetServer>, level: Res<Level>, mut images: ResMut<Assets<Image>>, mut materials: ResMut<Assets<StandardMaterial>>) {
-    let glow = Exposure { ev100: EXPOSURE }.exposure().recip() * LAMP_GLOW;
+fn lamp_glow(config: &Config) -> LinearRgba {
+    let glow = camera::exposure(config).exposure().recip() * if config.rosa_colours != 0 { 1.0 } else { 0.1 };
+
+    LinearRgba::rgb(glow, glow, glow)
+}
+
+fn change_glow(config: Res<Config>, street: Res<StreetMaterials>, mut materials: ResMut<Assets<StandardMaterial>>) {
+    for light in &street.lights {
+        if let Some(mut m) = materials.get_mut(light) {
+            m.emissive = lamp_glow(&config);
+        }
+    }
+}
+
+fn spawn_street_objects(mut commands: Commands, assets: Res<AssetServer>, level: Res<Level>, config: Res<Config>, mut images: ResMut<Assets<Image>>, mut materials: ResMut<Assets<StandardMaterial>>) {
     let lights = LIGHTS.map(|name| {
         let texture = |suffix: &str| Some(assets.load(format!("models/objects/textures/{name}{suffix}.png")));
 
@@ -148,7 +160,7 @@ fn spawn_street_objects(mut commands: Commands, assets: Res<AssetServer>, level:
             metallic_roughness_texture: texture("_mr"),
             metallic: 1.0,
             perceptual_roughness: 1.0,
-            emissive: LinearRgba::rgb(glow, glow, glow),
+            emissive: lamp_glow(&config),
             emissive_texture: texture("_emissive"),
             ..default()
         })

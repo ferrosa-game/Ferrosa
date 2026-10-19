@@ -139,6 +139,8 @@ pub fn spawn_options(commands: &mut Commands, config: &Config, devices: &AudioDe
         }
     });
 
+    flag(&mut commands, left, "Rosa-like Colours", config, |c| &mut c.rosa_colours);
+
     heading(&mut commands, left, "Controls");
     let sensitivity = ui::slider::slider_int(&mut commands, left, "Mouse Sensitivity", config.mouse_sensitivity.clamp(SENSITIVITY.0, SENSITIVITY.1), SENSITIVITY, ITEM.x);
     commands.entity(sensitivity).observe(|v: On<ValueChange<f32>>, mut config: ResMut<Config>| {

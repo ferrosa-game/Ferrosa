@@ -20,7 +20,6 @@ use super::{
 };
 use crate::{config::Config, character_model::HumanPose, menu::Screen};
 
-pub const EXPOSURE: f32 = 14.5;
 const STEP: f32 = 0.25;
 const FAST: f32 = 4.0;
 const SLOW: f32 = 0.25;
@@ -56,6 +55,7 @@ impl Plugin for CameraPlugin {
         app.add_systems(OnEnter(Screen::InGame), (spawn_camera, draw_menus_over_game))
             .add_systems(OnExit(Screen::InGame), restore_menu_camera)
             .add_systems(Update, capture_cursor)
+            .add_systems(Update, change_look.run_if(resource_changed::<Config>).run_if(in_state(Screen::InGame)))
             .add_systems(Update, fly_spectator.in_set(Smoothing::View).run_if(in_state(GameMenu::Closed)).run_if(|fp: Res<FirstPerson>| !fp.active));
     }
 }
@@ -76,23 +76,47 @@ fn spectator_start(map: &Map) -> Spectator {
     Spectator { pos: spawn + Vec3::new(32.0, 16.0, 0.0), yaw: -FRAC_PI_2, ..default() }
 }
 
-fn spawn_camera(mut commands: Commands, level: Res<Level>) {
+pub fn exposure(config: &Config) -> Exposure {
+    if config.rosa_colours != 0 { Exposure { ev100: 13.5 } } else { Exposure { ev100: 14.5 } }
+}
+
+pub fn tonemapping(config: &Config) -> Tonemapping {
+    if config.rosa_colours != 0 { Tonemapping::Reinhard } else { Tonemapping::AcesFitted }
+}
+
+fn look(camera: &mut EntityCommands, config: &Config) {
+    camera.insert(tonemapping(config));
+    camera.insert(exposure(config));
+
+    if config.rosa_colours != 0 {
+        camera.remove::<Bloom>();
+    } else {
+        camera.insert(Bloom::OLD_SCHOOL);
+    }
+}
+
+fn change_look(mut commands: Commands, config: Res<Config>, cameras: Query<Entity, With<GameCamera>>) {
+    for e in &cameras {
+        look(&mut commands.entity(e), &config);
+    }
+}
+
+fn spawn_camera(mut commands: Commands, level: Res<Level>, config: Res<Config>) {
     let spectator = spectator_start(&level.map);
 
-    commands.spawn((
+    let mut camera = commands.spawn((
         GameCamera,
         Camera3d::default(),
         Camera { order: -1, ..default() },
         NoIndirectDrawing, // This fixes a flashing issue on Dx12, why it exists? Idk.
         AtmosphereSettings::default(),
         AtmosphereEnvironmentMapLight::default(),
-        Exposure { ev100: EXPOSURE },
-        Tonemapping::AgX,
-        Bloom::OLD_SCHOOL,
         spectator.transform(),
         spectator,
         DespawnOnExit(Screen::InGame),
     ));
+
+    look(&mut camera, &config);
 }
 
 fn draw_menus_over_game(mut commands: Commands, mut cameras: Query<(Entity, &mut Camera), With<Camera2d>>) {

@@ -30,6 +30,7 @@ pub struct Config {
     pub player_hair_style: i32,
     pub player_eye_color: i32,
     pub manual_hands: i32,
+    pub rosa_colours: i32,
 }
 
 impl Config {
@@ -55,6 +56,7 @@ impl Config {
             player_hair_style: rng.random_range(0..9),
             player_eye_color: rng.random_range(0..8),
             manual_hands: 0,
+            rosa_colours: 1,
         }
     }
 
@@ -101,6 +103,7 @@ impl Config {
         v.int("playerhairstyle=", &mut self.player_hair_style);
         v.int("playereyecolor=", &mut self.player_eye_color);
         v.int("manualhands=", &mut self.manual_hands);
+        v.int("rosacolours=", &mut self.rosa_colours);
     }
 }
 

@@ -1,13 +1,16 @@
 use bevy::{
-    camera::{Exposure, RenderTarget, ScalingMode},
-    core_pipeline::tonemapping::Tonemapping,
+    camera::{RenderTarget, ScalingMode},
     prelude::*,
     render::render_resource::TextureFormat,
 };
 
 use super::{MAP_GROUND, MapPicture, SPAN};
 use crate::{
-    game::{Level, camera::EXPOSURE},
+    config::Config,
+    game::{
+        Level,
+        camera::{exposure, tonemapping},
+    },
     menu::Screen,
 };
 
@@ -22,7 +25,7 @@ const CAMERA_HEIGHT: f32 = 1000.0;
 #[derive(Component)]
 pub(super) struct PictureCamera(u32);
 
-pub(super) fn prepare_picture(mut commands: Commands, assets: Res<AssetServer>, level: Res<Level>, mut images: ResMut<Assets<Image>>) {
+pub(super) fn prepare_picture(mut commands: Commands, assets: Res<AssetServer>, level: Res<Level>, config: Res<Config>, mut images: ResMut<Assets<Image>>) {
     if level.map.map_name == "round" {
         commands.insert_resource(MapPicture { image: assets.load("round/map.png"), origin: ROUND_ORIGIN, scale: ROUND_SCALE, round: true });
         return;
@@ -39,8 +42,8 @@ pub(super) fn prepare_picture(mut commands: Commands, assets: Res<AssetServer>, 
         Camera { order: -2, clear_color: ClearColorConfig::Custom(MAP_GROUND), ..default() },
         RenderTarget::Image(image.clone().into()),
         Projection::Orthographic(projection),
-        Exposure { ev100: EXPOSURE },
-        Tonemapping::AcesFitted,
+        exposure(&config),
+        tonemapping(&config),
         Transform::from_xyz(centre.x, CAMERA_HEIGHT, centre.y).looking_at(Vec3::new(centre.x, 0.0, centre.y), Vec3::NEG_Z),
         DespawnOnExit(Screen::InGame),
     ));
