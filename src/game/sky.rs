@@ -6,7 +6,8 @@ use bevy::{
 
 use crate::{
     character_model::SHADOW_ONLY,
-    menu::{Screen, join::ServerSync},
+    game::netgame::sync::ServerSync,
+    menu::Screen,
 };
 
 const DEFAULT_SUN_ANGLE: f32 = 0.8;

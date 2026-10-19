@@ -97,6 +97,7 @@ struct CarWindow(usize);
 struct Glass {
     tinted: Handle<StandardMaterial>,
     clear: Handle<StandardMaterial>,
+    opaque: Handle<StandardMaterial>,
 }
 
 #[derive(Component)]
@@ -107,7 +108,9 @@ impl FromWorld for Glass {
         let glass = |base_color| StandardMaterial { base_color, alpha_mode: AlphaMode::Blend, perceptual_roughness: 0.05, reflectance: 0.5, cull_mode: None, ..default() };
         let mut materials = world.resource_mut::<Assets<StandardMaterial>>();
 
-        Self { tinted: materials.add(glass(GLASS)), clear: materials.add(glass(CLEAR_GLASS)) }
+        let opaque = StandardMaterial { alpha_mode: AlphaMode::Opaque, ..glass(GLASS.with_alpha(1.0)) };
+
+        Self { tinted: materials.add(glass(GLASS)), clear: materials.add(glass(CLEAR_GLASS)), opaque: materials.add(opaque) }
     }
 }
 
@@ -133,11 +136,8 @@ fn scene(assets: &AssetServer, path: String) -> WorldAssetRoot {
     WorldAssetRoot(assets.load(GltfAssetLabel::Scene(0).from_asset(path)))
 }
 
-fn vehicle_model(kind: VehicleKind, far: bool) -> String {
-    let name = model_name(kind);
-    let far_model = format!("models/vehicles/{name}_far.glb");
-
-    if far && std::path::Path::new("data").join(&far_model).exists() { far_model } else { format!("models/vehicles/{name}.glb") }
+fn vehicle_model(kind: VehicleKind) -> String {
+    format!("models/vehicles/{}.glb", model_name(kind))
 }
 
 fn wheel_model(model: usize) -> String {
@@ -153,7 +153,7 @@ fn paint_of(health: i32, color: u32) -> Paint {
 }
 
 fn spawn_vehicle(commands: &mut Commands, assets: &AssetServer, types: &VehicleTypes, kind: VehicleKind, root: impl Bundle) {
-    let body = vehicle_model(kind, false);
+    let body = vehicle_model(kind);
     let vehicle = commands.spawn((root, Visibility::default(), DespawnOnExit(Screen::InGame))).id();
 
     commands.spawn((scene(assets, body), ChildOf(vehicle)));
@@ -295,7 +295,7 @@ fn sync_traffic(
     }
 
     for (i, car) in net.traffic.iter().enumerate().take(count).filter(|(i, _)| !drawn[*i]) {
-        let body = vehicle_model(car.kind, true);
+        let body = vehicle_model(car.kind);
         let place = place_traffic(&level.map, types.get(car.kind), carried_on(&car.track, net.tick), car.yaw);
         let traffic = (NetTraffic { index: i, kind: car.kind }, Paint(car.color.min(COLUMNS - 1)), Snapshots::new(net.tick, place), place, Visibility::default());
         let e = commands.spawn((traffic, DespawnOnExit(Screen::InGame))).id();
@@ -327,12 +327,19 @@ fn glaze(
     glass: Res<Glass>,
     mut panes: Query<(Entity, &mut MeshMaterial3d<StandardMaterial>), Added<MeshMaterial3d<StandardMaterial>>>,
     names: Query<&Name>,
+    traffic: Query<(), With<NetTraffic>>,
     parents: Query<&ChildOf>,
 ) {
     for (e, mut material) in &mut panes {
         let in_window = std::iter::once(e).chain(parents.iter_ancestors(e)).any(|a| names.get(a).is_ok_and(|n| window_of(n.as_str()).is_some()));
 
-        if in_window {
+        if !in_window {
+            continue;
+        }
+
+        if parents.iter_ancestors(e).any(|a| traffic.contains(a)) {
+            material.0 = glass.opaque.clone();
+        } else {
             material.0 = glass.tinted.clone();
             commands.entity(e).insert(Pane);
         }

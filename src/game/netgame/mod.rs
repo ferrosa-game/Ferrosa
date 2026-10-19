@@ -19,8 +19,9 @@ pub mod entities;
 pub mod send;
 pub mod receive;
 pub mod events;
+pub mod sync;
 
-use crate::{game::netgame::entities::{Human, Item, Player, TrafficCar, Vehicle}, menu::join::ServerSync};
+use crate::game::netgame::{entities::{Human, Item, Player, TrafficCar, Vehicle}, sync::ServerSync};
 
 pub const PLAYERS: usize = 0x100;
 pub const HUMANS: usize = 0x100;

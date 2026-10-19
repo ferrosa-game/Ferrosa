@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use ferrosa_protocol::{clientbound::{game::{GameState, ItemKind, ItemTail, MenuType, ServerGamePacket, decode::SlotChange}, initial_sync::InitialSync}, codec::{Reader, WireRead}};
 
-use crate::{game::netgame::{ADMIN_NAME, EVENTS, HUMANS, INVENTORY_SLOTS, ITEMS, LINKS, MAX_ITEM_CHILDREN, MEMO_LINE, MEMO_SIZE, NetGame, PLAYERS, SCREEN_COLUMNS, SCREEN_LINES, STALE, TIMEOUT, TRAFFIC, VEHICLES, VOICE_FRAMES, VOICE_RECEIVED, entities::Item}, menu::join::ServerSync, net::ClientSocket};
+use crate::{game::netgame::{ADMIN_NAME, EVENTS, HUMANS, INVENTORY_SLOTS, ITEMS, LINKS, MAX_ITEM_CHILDREN, MEMO_LINE, MEMO_SIZE, NetGame, PLAYERS, SCREEN_COLUMNS, SCREEN_LINES, STALE, TIMEOUT, TRAFFIC, VEHICLES, VOICE_FRAMES, VOICE_RECEIVED, entities::Item, sync::ServerSync}, net::ClientSocket};
 
 impl NetGame {
     pub fn receive(&mut self, socket: &mut ClientSocket, now: u32) -> bool {

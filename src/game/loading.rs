@@ -12,7 +12,8 @@ use ferrosa_world::{item_types::item_types, map::Map, vehicle_types::vehicle_typ
 
 use super::{Level, blocks, items::ItemTypes, netgame::NetGame, terrain, vehicles::VehicleTypes};
 use crate::{
-    menu::{Screen, join::ServerSync},
+    game::netgame::sync::ServerSync,
+    menu::Screen,
     net::ClientSocket,
     ui::{self, Shortcut},
 };
