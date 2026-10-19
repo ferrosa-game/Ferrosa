@@ -15,9 +15,9 @@ rodio = { version = "0.23.0", features = ["wav"] }
 rusty-opus = "1.0.2"
 sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time"] }
-ferrosa-protocol = { path = "../new_server/crates/ferrosa-protocol" }
-ferrosa-map = { path = "../new_server/crates/ferrosa-map" }
-ferrosa-world = { path = "../new_server/crates/ferrosa-world" }
+ferrosa-protocol = { git = "https://github.com/ferrosa-game/Dedicated-Server.git", branch = "main"}
+ferrosa-map = { git = "https://github.com/ferrosa-game/Dedicated-Server.git", branch = "main"}
+ferrosa-world = { git = "https://github.com/ferrosa-game/Dedicated-Server.git", branch = "main"}
 binrw = "0.15.0"
 discord-sdk = "0.4.0"
 reqwest = { version = "0.13.5", features = ["json", "blocking"] }
