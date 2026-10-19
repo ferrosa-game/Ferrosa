@@ -40,8 +40,9 @@ impl NetGame {
         match ev.kind {
             ServerEvent::Chat(event) => {
                 let muted = event.chat_type == ChatType::Announce && usize::try_from(event.speaker_id).ok().and_then(|p| self.players.get(p)).is_some_and(|p| p.muted);
+                let spectator = event.chat_type == ChatType::Announce && event.speaker_id >= 0;
 
-                if !muted && (fresh || matches!(event.chat_type, ChatType::EliminatorAnnouncement | ChatType::Notice)) {
+                if !muted && !(spectator && self.alive()) && (fresh || matches!(event.chat_type, ChatType::EliminatorAnnouncement | ChatType::Notice)) {
                     info!("chat {:?}: {}", event.chat_type, event.message);
 
                     let life = if matches!(event.chat_type, ChatType::Announce | ChatType::AdminChat) { LONG_CHAT } else { SHORT_CHAT };

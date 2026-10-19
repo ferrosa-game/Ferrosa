@@ -249,6 +249,10 @@ impl NetGame {
             .and_then(|p| self.players.get(p))
     }
 
+    pub fn alive(&self) -> bool {
+        self.game_state != GameState::Restarting && self.me().and_then(|p| usize::try_from(p.human).ok()).and_then(|h| self.humans.get(h)).is_some_and(|h| h.active && h.alive)
+    }
+
     pub fn me_mut(&mut self) -> Option<&mut Player> {
         usize::try_from(self.player)
             .ok()
