@@ -32,6 +32,10 @@ impl ClientSocket {
     pub fn open() -> Self {
         let socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).ok().filter(|s| s.set_nonblocking(true).is_ok());
 
+        if let Some(s) = &socket {
+            let _ = s.set_broadcast(true);
+        }
+
         Self { socket, fragment_id: 0, slots: vec![Reassembly::default(); FRAGMENT_SLOTS], first: 0, next: 0 }
     }
 

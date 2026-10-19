@@ -19,6 +19,8 @@ use crate::{
 
 const MAX_SERVERS: usize = 0x2000;
 const SEND_EVERY: u32 = 10;
+const LAN_EVERY: u32 = 2000;
+const LAN_PORTS: std::ops::Range<u16> = 27584..27588;
 const LIST: Vec2 = Vec2::new(960.0, 420.0);
 const COLUMNS: [(&str, f32); 5] = [("Ping", 80.0), ("Players", 90.0), ("Game Type", 120.0), ("Version", 110.0), ("Password", 100.0)];
 const ROW_HEIGHT: f32 = 28.0;
@@ -39,6 +41,7 @@ pub struct ServerEntry {
     pub ping: u32,
     pub game_type: i32,
     pub password: bool,
+    pub lan: bool,
 }
 
 fn unspecified() -> SocketAddrV4 {
@@ -59,7 +62,14 @@ impl ServerEntry {
             ping: 0,
             game_type: 0,
             password: false,
+            lan: false,
         }
+    }
+
+    fn answered_by(&self, from: SocketAddrV4, advertised: SocketAddrV4) -> bool {
+        let known = |a: SocketAddrV4| !a.ip().is_unspecified() && a.port() != 0;
+
+        self.addr == from || (known(advertised) && (self.advertised == advertised || self.addr == advertised)) || (known(self.advertised) && self.advertised == from)
     }
 
     fn cells(&self) -> [String; 6] {
@@ -71,7 +81,7 @@ impl ServerEntry {
             _ => "",
         };
         [
-            self.name.clone(),
+            if self.lan { format!("{} (LAN)", self.name) } else { self.name.clone() },
             self.ping.to_string(),
             format!("{}/{}", self.players, self.max_players),
             mode.to_string(),
@@ -106,12 +116,13 @@ pub struct ServerBrowser {
     total: usize,
     ping_index: usize,
     last_send: u32,
+    last_lan: Option<u32>,
     request: ListRequest,
 }
 
 impl ServerBrowser {
     fn new(now: u32) -> Self {
-        Self { entries: Vec::new(), addresses: vec![unspecified(); MAX_SERVERS], total: 0, ping_index: 0, last_send: now, request: ListRequest::Idle }
+        Self { entries: Vec::new(), addresses: vec![unspecified(); MAX_SERVERS], total: 0, ping_index: 0, last_send: now, last_lan: None, request: ListRequest::Idle }
     }
 }
 
@@ -213,6 +224,16 @@ fn browse(time: Res<Time<Real>>, master: Option<Res<MasterAuth>>, mut socket: Re
         }
     }
 
+    if list.last_lan.is_none_or(|t| now.wrapping_sub(t) > LAN_EVERY) {
+        list.last_lan = Some(now);
+
+        for port in LAN_PORTS {
+            for ip in [Ipv4Addr::BROADCAST, Ipv4Addr::LOCALHOST] {
+                socket.send(&frame_packet(InfoRequest { version: 38_u8, timestamp: now }), SocketAddrV4::new(ip, port));
+            }
+        }
+    }
+
     if !signed_in {
         return;
     }
@@ -225,17 +246,16 @@ fn browse(time: Res<Time<Real>>, master: Option<Res<MasterAuth>>, mut socket: Re
                 let SocketAddr::V4(from) = packet.from else { continue };
                 let Ok(info) = ServerInfo::read(&mut r) else { continue };
 
-                let k = match list.entries.iter().position(|e| e.addr == from) {
+                let advertised = if info.build > 0x1a { SocketAddrV4::new(Ipv4Addr::from(u32::from_le_bytes(info.address)), info.port) } else { unspecified() };
+                let local = from.ip().is_private() || from.ip().is_loopback() || from.ip().is_link_local();
+
+                let k = match list.entries.iter().position(|e| e.answered_by(from, advertised)) {
                     Some(k) => k,
                     None => {
                         let mut e = ServerEntry::new(from);
                         e.name = info.server_name.clone();
                         e.id = info.id as u32;
-
-                        if info.build > 0x1a {
-                            e.advertised = SocketAddrV4::new(Ipv4Addr::from(u32::from_le_bytes(info.address)), info.port);
-                        }
-
+                        e.advertised = advertised;
                         e.password = info.password_protected;
                         e.sub_version = info.sub_version as i32;
 
@@ -245,6 +265,12 @@ fn browse(time: Res<Time<Real>>, master: Option<Res<MasterAuth>>, mut socket: Re
                 };
 
                 let e = &mut list.entries[k];
+
+                if local && !e.lan {
+                    e.addr = from;
+                    e.lan = true;
+                }
+
                 e.version = info.build as i32;
                 e.ping = (time.elapsed().as_millis() as u32).wrapping_sub(info.timestamp);
                 e.game_type = info.gamemode as i32;
@@ -319,7 +345,9 @@ fn show_status(list: Res<ServerBrowser>, master: Option<Res<MasterAuth>>, mut st
     } else if list.request != ListRequest::Received {
         "Asking for the server list...".to_string()
     } else {
-        format!("{} servers listed, {} answered, {} not joinable", list.total, list.entries.len(), list.entries.iter().filter(|c| !c.joinable()).count())
+        let lan = list.entries.iter().filter(|e| e.lan).count();
+
+        format!("{} servers listed, {} answered ({lan} on LAN), {} not joinable", list.total, list.entries.len(), list.entries.iter().filter(|c| !c.joinable()).count())
     };
 
     for mut text in &mut status {
