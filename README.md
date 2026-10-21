@@ -5,6 +5,14 @@
   </picture>
 </p>
 
+# Links
+
+<div class="header" align="center">  
+  
+[Download](https://github.com/ferrosa-game/Ferrosa/releases/lstest) | [Discord](https://discord.gg/yZJWc6MsMZ)
+  
+</div>
+
 # Ferrosa
 
 A game about money making, deal breaking, and corporate shenanigans! Open source!
