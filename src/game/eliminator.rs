@@ -5,10 +5,12 @@ use ferrosa_protocol::{
 };
 
 use super::{
+    camera::GameCamera,
     escape_menu::ROSTER_LAYER,
     hud::{Stick, align, anchored, colour, spawn_screen, text},
     mute::{Voice, VoiceIcons, voice_icon},
-    netgame::NetGame,
+    netgame::{NetGame, PROTECTOR},
+    smoothing::Smoothing,
 };
 use crate::{fonts::GameFonts, menu::Screen, names::phone_number};
 
@@ -17,6 +19,12 @@ const RED: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
 const WHITE: [f32; 4] = [1.0; 4];
 const ICON: f32 = 24.0;
 const ROW: f32 = 24.0;
+const ELIMINATOR: i32 = 1;
+const BOX_RED: [f32; 4] = [1.0, 0.0, 0.0, 0.75];
+const BOX_GREEN: [f32; 4] = [0.0, 1.0, 0.0, 0.75];
+const BOX_NEAR: f32 = 3072.0;
+const BOX_MIN: f32 = 8.0;
+const BOX_MAX: f32 = 192.0;
 const STORY: [(&str, f32, f32); 11] = [
     ("It is the present, the year 1985.", 64.0, 20.0),
     ("A robot from the year 2019 has been sent back in time", 84.0, 20.0),
@@ -58,6 +66,9 @@ struct View {
 #[derive(Component)]
 struct EliminatorScreen;
 
+#[derive(Component)]
+struct TargetLayer;
+
 #[derive(Resource, Default)]
 struct Shown(Option<View>);
 
@@ -66,9 +77,53 @@ pub struct EliminatorPlugin;
 impl Plugin for EliminatorPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Shown>()
-            .add_systems(Update, show_eliminator.run_if(in_state(Screen::InGame)).run_if(resource_exists::<NetGame>))
+            .add_systems(OnEnter(Screen::InGame), spawn_target_layer)
+            .add_systems(Update, (show_eliminator, show_target_box.after(Smoothing::Glide)).run_if(in_state(Screen::InGame)).run_if(resource_exists::<NetGame>))
             .add_systems(OnExit(Screen::InGame), |mut shown: ResMut<Shown>| shown.0 = None);
     }
+}
+
+fn spawn_target_layer(mut commands: Commands) {
+    let full = Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), ..default() };
+
+    commands.spawn((full, TargetLayer, Pickable::IGNORE, DespawnOnExit(Screen::InGame)));
+}
+
+fn show_target_box(
+    mut commands: Commands,
+    net: Res<NetGame>,
+    scale: Res<UiScale>,
+    camera: Single<(&Camera, &GlobalTransform), With<GameCamera>>,
+    layer: Single<(Entity, Option<&Children>), With<TargetLayer>>,
+) {
+    let (layer, children) = *layer;
+    children.into_iter().flatten().for_each(|&c| commands.entity(c).despawn());
+
+    if net.sync.game_type != GameMode::Eliminator {
+        return;
+    }
+
+    let tint = match net.role {
+        ELIMINATOR => BOX_RED,
+        PROTECTOR => BOX_GREEN,
+        _ => return,
+    };
+
+    let Some(target) = net.target.filter(|t| t.x != 0.0) else { return };
+
+    let (camera, view) = *camera;
+    let size = (BOX_NEAR / target.distance(view.translation()) + 4.0).clamp(BOX_MIN, BOX_MAX);
+
+    let Ok(on_screen) = camera.world_to_viewport(view, target) else { return };
+    let (node, shift) = anchored(align::CENTRE, on_screen / scale.0);
+
+    commands.spawn((
+        Node { width: px(size), height: px(size), border: UiRect::all(px(size / 16.0)), ..node },
+        shift,
+        BorderColor::all(colour(tint)),
+        Pickable::IGNORE,
+        ChildOf(layer),
+    ));
 }
 
 fn say(text: impl Into<String>, x: f32, y: f32, size: f32, colour: [f32; 4]) -> Text {

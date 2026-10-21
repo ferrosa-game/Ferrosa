@@ -1,8 +1,5 @@
 use bevy::{
-    camera::visibility::NoFrustumCulling,
-    image::ImageSampler,
-    mesh::{Indices, PrimitiveTopology},
-    prelude::*,
+    camera::visibility::NoFrustumCulling, image::ImageSampler, light::NotShadowCaster, mesh::{Indices, PrimitiveTopology}, prelude::*,
 };
 use ferrosa_protocol::clientbound::game::GameState;
 use ferrosa_world::trace::line_intersect_level;
@@ -18,12 +15,8 @@ use crate::menu::Screen;
 
 const MAX_BULLETS: usize = 0x4000;
 const MAX_HOLES: usize = 0x4000;
-const LIFETIME: i32 = 600;
 const GRAVITY: f32 = 9.8 / 60.0 / 60.0;
 const DRAG: [f32; 4] = [0.00456, 0.003916, 0.007952, 0.005832];
-const TRACER_LIFE: i32 = 3;
-const HOLE_LIFT: f32 = 1.0 / 64.0;
-const RICOCHET: i32 = 0;
 
 struct Bullet {
     kind: usize,
@@ -85,8 +78,8 @@ fn spawn_shot_meshes(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, m
     let line = StandardMaterial { base_color: Color::WHITE, unlit: true, alpha_mode: AlphaMode::Blend, ..default() };
     let hole = StandardMaterial { base_color: Color::BLACK, base_color_texture: Some(images.add(spot)), unlit: true, alpha_mode: AlphaMode::Blend, cull_mode: None, ..default() };
 
-    commands.spawn((Mesh3d(tracers.clone()), MeshMaterial3d(materials.add(line)), NoFrustumCulling, DespawnOnExit(Screen::InGame)));
-    commands.spawn((Mesh3d(holes.clone()), MeshMaterial3d(materials.add(hole)), NoFrustumCulling, DespawnOnExit(Screen::InGame)));
+    commands.spawn((Mesh3d(tracers.clone()), MeshMaterial3d(materials.add(line)), NoFrustumCulling, DespawnOnExit(Screen::InGame), NotShadowCaster));
+    commands.spawn((Mesh3d(holes.clone()), MeshMaterial3d(materials.add(hole)), NoFrustumCulling, DespawnOnExit(Screen::InGame), NotShadowCaster));
     commands.insert_resource(ShotMeshes { tracers, holes });
 }
 
@@ -117,20 +110,20 @@ fn fly_bullets(net: Res<NetGame>, level: Option<Res<Level>>, mut shots: ResMut<S
             b.time = 0;
         }
 
-        tracers.push(Tracer { from, to: b.pos, life: TRACER_LIFE });
+        tracers.push(Tracer { from, to: b.pos, life: 3 });
     }
 
     for happening in fresh {
         match happening {
             NetEvent::Gunshot { bullet, pos, vel, .. } if bullets.len() < MAX_BULLETS => {
-                bullets.push(Bullet { kind: usize::try_from(bullet).unwrap_or(0).min(DRAG.len() - 1), time: LIFETIME, pos, vel });
+                bullets.push(Bullet { kind: usize::try_from(bullet).unwrap_or(0).min(DRAG.len() - 1), time: 600, pos, vel });
             }
-            NetEvent::BulletHit { hit: RICOCHET, pos, normal } if holes.len() < MAX_HOLES => {
+            NetEvent::BulletHit { hit: 0, pos, normal } if holes.len() < MAX_HOLES => {
                 let n = normal.normalize_or_zero();
                 let (side, up) = frame_across(n);
                 let size = (rand::random::<u32>() & 0x1f) as f32 / 1024.0 + 1.0 / 32.0;
 
-                holes.push(Hole { pos: pos + n * HOLE_LIFT, side, up, size });
+                holes.push(Hole { pos: pos + n * (1.0 / 64.0), side, up, size });
             }
             _ => {}
         }

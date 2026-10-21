@@ -2917,7 +2917,7 @@ dependencies = [
 [[package]]
 name = "ferrosa-map"
 version = "0.2.1"
-source = "git+https://github.com/ferrosa-game/Dedicated-Server.git?branch=main#86fc58f1523397354e2a3338cf1307beebd5fc05"
+source = "git+https://github.com/ferrosa-game/Dedicated-Server.git?branch=main#117857d3c9b9588e7bdba72bbb0d369c371d6a16"
 dependencies = [
  "binrw",
  "glam",
@@ -2930,7 +2930,7 @@ dependencies = [
 [[package]]
 name = "ferrosa-physics"
 version = "0.2.1"
-source = "git+https://github.com/ferrosa-game/Dedicated-Server.git?branch=main#86fc58f1523397354e2a3338cf1307beebd5fc05"
+source = "git+https://github.com/ferrosa-game/Dedicated-Server.git?branch=main#117857d3c9b9588e7bdba72bbb0d369c371d6a16"
 dependencies = [
  "glam",
  "rayon",
@@ -2939,7 +2939,7 @@ dependencies = [
 [[package]]
 name = "ferrosa-protocol"
 version = "0.2.1"
-source = "git+https://github.com/ferrosa-game/Dedicated-Server.git?branch=main#86fc58f1523397354e2a3338cf1307beebd5fc05"
+source = "git+https://github.com/ferrosa-game/Dedicated-Server.git?branch=main#117857d3c9b9588e7bdba72bbb0d369c371d6a16"
 dependencies = [
  "bitflags 2.13.2",
  "glam",
@@ -2950,7 +2950,7 @@ dependencies = [
 [[package]]
 name = "ferrosa-world"
 version = "0.2.1"
-source = "git+https://github.com/ferrosa-game/Dedicated-Server.git?branch=main#86fc58f1523397354e2a3338cf1307beebd5fc05"
+source = "git+https://github.com/ferrosa-game/Dedicated-Server.git?branch=main#117857d3c9b9588e7bdba72bbb0d369c371d6a16"
 dependencies = [
  "ferrosa-map",
  "ferrosa-physics",
@@ -4186,9 +4186,9 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
 name = "memmap2"
-version = "0.9.11"
+version = "0.9.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1219ed1b7f229ee7104d281dd01d6802fe28bb6e95d292942c4daacdeb798c0"
+checksum = "6b0ca1155a9ecc25aa12e8313a119f32edf0255fea2f44839c4ac0a12b2ac157"
 dependencies = [
  "libc",
 ]
