@@ -13,8 +13,6 @@ use super::{
 };
 use crate::menu::Screen;
 
-const MAX_BULLETS: usize = 0x4000;
-const MAX_HOLES: usize = 0x4000;
 const GRAVITY: f32 = 9.8 / 60.0 / 60.0;
 const DRAG: [f32; 4] = [0.00456, 0.003916, 0.007952, 0.005832];
 
@@ -115,10 +113,10 @@ fn fly_bullets(net: Res<NetGame>, level: Option<Res<Level>>, mut shots: ResMut<S
 
     for happening in fresh {
         match happening {
-            NetEvent::Gunshot { bullet, pos, vel, .. } if bullets.len() < MAX_BULLETS => {
+            NetEvent::Gunshot { bullet, pos, vel, .. } => {
                 bullets.push(Bullet { kind: usize::try_from(bullet).unwrap_or(0).min(DRAG.len() - 1), time: 600, pos, vel });
             }
-            NetEvent::BulletHit { hit: 0, pos, normal } if holes.len() < MAX_HOLES => {
+            NetEvent::BulletHit { hit: 0, pos, normal } => {
                 let n = normal.normalize_or_zero();
                 let (side, up) = frame_across(n);
                 let size = (rand::random::<u32>() & 0x1f) as f32 / 1024.0 + 1.0 / 32.0;

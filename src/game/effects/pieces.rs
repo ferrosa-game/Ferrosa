@@ -1,7 +1,7 @@
 use bevy::{light::NotShadowCaster, prelude::*};
 use ferrosa_protocol::clientbound::game::GameState;
 
-use super::{DRAG, EffectAssets, GRAVITY, Particles, RESTING_LIFT, spin_axes, trace};
+use super::{EffectAssets, GRAVITY, Particles, RESTING_LIFT, spin_axes, trace};
 use crate::{
     game::{
         Level,
@@ -11,8 +11,6 @@ use crate::{
     menu::Screen,
 };
 
-const MAX_PIECES: usize = 0x4000;
-const FLOOR: f32 = 0.7;
 const STILL: f32 = 1.0 / 120.0;
 const CLINK: f32 = 1.0 / 60.0;
 const MIN_SPIN: f32 = 1.0 / 65536.0;
@@ -58,10 +56,6 @@ pub(super) fn spawn_piece(
     vel: Vec3,
     axes: [Vec3; 3],
 ) {
-    if particles.pieces >= MAX_PIECES {
-        return;
-    }
-
     let turn = (rand::random_range(-1.0f32..1.0) * 4.0 + 12.0) / 60.0;
     let back = -(rand::random_range(-1.0f32..1.0) * 4.0 + 12.0) / 60.0;
     let spin = axes[1] * turn + axes[0] * back;
@@ -103,7 +97,7 @@ pub(super) fn simulate_pieces(mut net: ResMut<NetGame>, level: Option<Res<Level>
             spin_axes(&mut piece.axes, piece.spin / turn, turn);
         }
 
-        piece.vel = Vec3::new(piece.vel.x, piece.vel.y - GRAVITY, piece.vel.z) * DRAG;
+        piece.vel = Vec3::new(piece.vel.x, piece.vel.y - GRAVITY, piece.vel.z) * 0.9975;
 
         let old = piece.pos;
         piece.pos += piece.vel;
@@ -123,7 +117,7 @@ pub(super) fn simulate_pieces(mut net: ResMut<NetGame>, level: Option<Res<Level>
             let flat = piece.axes[0].cross(Vec3::Y).normalize_or_zero();
             piece.axes = [Vec3::Y.cross(flat).normalize_or_zero(), Vec3::Y, flat];
 
-            if n.y > FLOOR && piece.vel.length() < STILL {
+            if n.y > 0.7 && piece.vel.length() < STILL {
                 piece.vel = Vec3::ZERO;
                 piece.spin = Vec3::ZERO;
             }

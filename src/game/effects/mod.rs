@@ -27,12 +27,7 @@ use super::{
 };
 use crate::menu::Screen;
 
-const MAX_PARTICLES: usize = 0x4000;
-const FOREVER: i32 = 0xffff;
 const GRAVITY: f32 = 9.8 / 60.0 / 60.0;
-const DRAG: f32 = 399.0 / 400.0;
-const SMOKE_DRAG: f32 = 0.975;
-const SMOKE_LIFE: i32 = 0x3c;
 pub(super) const FLASH_LIFE: i32 = 4;
 const LIFT: f32 = 1.0 / 64.0;
 const RESTING_LIFT: f32 = 1.0 / 512.0;
@@ -43,8 +38,6 @@ const METAL: i32 = 2;
 const GRAZE: i32 = 3;
 const CASE_MODEL: &str = "models/items/case.glb";
 const CHIP_MODEL: &str = "models/items/chip.glb";
-const CASE_METALLIC: f32 = 0.5;
-const CASE_ROUGHNESS: f32 = 0.125;
 const CHIP_COLOUR: Color = Color::srgb(0.3, 0.3, 0.3);
 const BLOOD_SHADE: Color = Color::srgb(0.25, 0.0, 0.0);
 const GLASS: Color = Color::srgba(0.6, 0.7, 0.75, 0.35);
@@ -77,7 +70,7 @@ struct Particle {
 
 impl Particle {
     fn new(kind: Kind, pos: Vec3, vel: Vec3) -> Self {
-        Self { kind, life: FOREVER, gravity: GRAVITY, drag: DRAG, size: 0.0, pos, vel, frame: [Vec3::ZERO; 3], corner_vel: [Vec3::ZERO; 3], rest: [0.0; 3], spin_axis: Vec3::ZERO, spin: 0.0, gun: None }
+        Self { kind, life: 65535, gravity: GRAVITY, drag:0.9975, size: 0.0, pos, vel, frame: [Vec3::ZERO; 3], corner_vel: [Vec3::ZERO; 3], rest: [0.0; 3], spin_axis: Vec3::ZERO, spin: 0.0, gun: None }
     }
 }
 
@@ -86,14 +79,6 @@ struct Particles {
     round: u32,
     list: Vec<Particle>,
     pieces: usize,
-}
-
-impl Particles {
-    fn add(&mut self, p: Particle) {
-        if self.list.len() < MAX_PARTICLES {
-            self.list.push(p);
-        }
-    }
 }
 
 #[derive(Resource)]
@@ -135,7 +120,7 @@ pub fn empty_mesh(topology: PrimitiveTopology, vertices: usize) -> Mesh {
 fn spawn_effect_assets(mut commands: Commands, assets: Res<AssetServer>, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, mut images: ResMut<Assets<Image>>) {
     let primitive = |path: &str| assets.load(GltfAssetLabel::Primitive { mesh: 0, primitive: 0 }.from_asset(path.to_string()));
     let case_texture = assets.load(GltfAssetLabel::Texture(0).from_asset(CASE_MODEL));
-    let case_material = materials.add(StandardMaterial { base_color_texture: Some(case_texture), metallic: CASE_METALLIC, perceptual_roughness: CASE_ROUGHNESS, ..default() });
+    let case_material = materials.add(StandardMaterial { base_color_texture: Some(case_texture), metallic: 0.5, perceptual_roughness: 0.125, ..default() });
     let chip_material = materials.add(StandardMaterial { base_color: CHIP_COLOUR, perceptual_roughness: 0.9, ..default() });
 
     let mut spot = textures::particle().into_image();
@@ -246,7 +231,7 @@ fn emit_effects(
                     let mut p = Particle::new(Kind::Flash, muzzle, Vec3::ZERO);
                     (p.life, p.drag, p.gun) = (FLASH_LIFE, 0.0, Some(gun));
 
-                    particles.add(p);
+                    particles.list.push(p);
                 }
             }
             NetEvent::BulletHit { hit: RICOCHET, pos, normal } => {
@@ -261,21 +246,21 @@ fn emit_effects(
                     let size = blood();
                     let mut p = Particle::new(Kind::Blood, pos, random_vec3(1.0 / 30.0, 1.0 / 120.0));
                     p.size = size * 0.25;
-                    particles.add(p);
+                    particles.list.push(p);
                 }
             }
             NetEvent::BulletHit { hit: METAL, pos, .. } => {
                 for _ in 0..8 {
                     let mut p = Particle::new(Kind::Smoke, pos, random_vec3(1.0 / 30.0, 1.0 / 120.0));
-                    (p.life, p.size, p.drag) = (SMOKE_LIFE, small(), SMOKE_DRAG);
-                    particles.add(p);
+                    (p.life, p.size, p.drag) = (60, small(), 0.975);
+                    particles.list.push(p);
                 }
             }
             NetEvent::Explosion { pos } => {
                 for _ in 0..0x80 {
                     let mut p = Particle::new(Kind::Smoke, pos, random_vec3(1.0 / 15.0, 1.0 / 3.0));
-                    (p.life, p.size, p.drag) = (SMOKE_LIFE, small(), SMOKE_DRAG);
-                    particles.add(p);
+                    (p.life, p.size, p.drag) = (60, small(), 0.975);
+                    particles.list.push(p);
                 }
             }
             NetEvent::WindowBroke { vehicle, window, pos, vel } => {
@@ -370,7 +355,7 @@ fn simulate_particles(net: Res<NetGame>, level: Option<Res<Level>>, mut particle
     }
 
     particles.list.retain_mut(|p| {
-        if p.life < FOREVER {
+        if p.life < 65535 {
             p.life -= 1;
         }
 

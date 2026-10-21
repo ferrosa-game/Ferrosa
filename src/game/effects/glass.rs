@@ -32,7 +32,7 @@ pub(super) fn shatter_window(particles: &mut Particles, c: [Vec3; 4], hit: Vec3,
             s.frame = [side, up, n];
             s.spin_axis = Vec3::new(byte() / 512.0 - 0.25, byte() / 512.0 - 0.25, byte() / 512.0 - 0.25).normalize_or_zero();
             s.spin = (byte() / 512.0 - 0.25) * 0.5;
-            particles.add(s);
+            particles.list.push(s);
             p += step;
         }
 
@@ -64,7 +64,7 @@ pub(super) fn break_pane(particles: &mut Particles, level: &mut Level, cell: IVe
             t.corner_vel = [Vec3::ZERO, Vec3::ZERO, hit_vel / 64.0];
             t.life = PANE_LIFE;
             t.rest = [t.frame[0].distance(t.frame[1]), t.frame[1].distance(t.frame[2]), t.frame[2].distance(t.frame[0])];
-            particles.add(t);
+            particles.list.push(t);
         }
     }
 
