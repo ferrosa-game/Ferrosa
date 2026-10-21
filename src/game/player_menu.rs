@@ -1,6 +1,6 @@
 use bevy::{prelude::*, ui::InteractionDisabled, ui_widgets::Activate};
 use ferrosa_protocol::{
-    GameMode, Team,
+    GameMode, SuitColor, Team,
     clientbound::game::{ItemKind, MenuButton, MenuType},
 };
 
@@ -57,7 +57,7 @@ const GUN_STORE: i32 = 8;
 const BURGERS: i32 = 9;
 const COLOUR_NAMES: [&str; 6] = ["Black", "Red", "Blue", "Silver", "White", "Gold"];
 const CLOTHES: [&str; 5] = ["Blue Suit", "Red Suit", "White Suit", "Necklace", "Cash Necklace"];
-const WORN: [(u8, u8); 5] = [(3, 0), (8, 0), (7, 0), (0, 1), (0, 2)];
+const WORN: [(Option<SuitColor>, u8); 5] = [(Some(SuitColor::Navy), 0), (Some(SuitColor::Red), 0), (Some(SuitColor::White), 0), (None, 1), (None, 2)];
 
 #[derive(Component, Clone, Copy)]
 pub struct Choice(pub i32);
@@ -79,7 +79,7 @@ struct MenuView {
     buttons: Vec<MenuButton>,
     building: i32,
     stock: Vec<(i32, i32, i32)>,
-    suit: u8,
+    suit: SuitColor,
     necklace: u8,
 }
 
@@ -308,7 +308,7 @@ fn store(commands: &mut Commands, panel: Entity, view: &MenuView, item_name: &dy
             BURGERS => "Burger".to_string(),
             _ => continue,
         };
-        let worn = view.building == CLOTHING && WORN.get(i).is_some_and(|&(suit, necklace)| (suit != 0 && view.suit == suit) || (necklace != 0 && view.necklace == necklace));
+        let worn = view.building == CLOTHING && WORN.get(i).is_some_and(|&(suit, necklace)| suit == Some(view.suit) || (necklace != 0 && view.necklace == necklace));
         let b = choice(commands, column, &label, i as i32 + 1, SHOP_BUTTON);
 
         with_price(commands, b, cost);

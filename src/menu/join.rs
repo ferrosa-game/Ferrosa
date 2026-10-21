@@ -1,5 +1,6 @@
 use bevy::{prelude::*, ui_widgets::{Activate, ValueChange}};
 use ferrosa_protocol::{
+    Gender,
     clientbound::{initial_sync::InitialSync, kick::KickClient},
     codec::{Reader, WireRead},
     frame_packet,
@@ -124,7 +125,7 @@ fn join_server(
                 auth_ticket: join.ticket,
                 player_name: name.map(|n| n.0.clone()).unwrap_or_default(),
                 avatar_info: AvatarInfo {
-                    gender: look_byte(look.gender),
+                    gender: Gender::from_bit(look.gender as u32),
                     head: look_byte(look.head),
                     skin_color: look_byte(look.skin),
                     hair_color: look_byte(look.hair_colour),

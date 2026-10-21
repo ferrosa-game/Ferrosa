@@ -9,7 +9,7 @@
 
 <div class="header" align="center">  
   
-[Download](https://github.com/ferrosa-game/Ferrosa/releases/lstest) | [Discord](https://discord.gg/yZJWc6MsMZ)
+[Download](https://github.com/ferrosa-game/Ferrosa/releases/latest) | [Discord](https://discord.gg/yZJWc6MsMZ)
   
 </div>
 
