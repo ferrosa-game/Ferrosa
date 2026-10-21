@@ -315,9 +315,9 @@ fn window_of(name: &str) -> Option<usize> {
 fn hide_physics(mut commands: Commands, named: Query<(Entity, &Name), Added<Name>>) {
     for (e, name) in &named {
         if let Some(window) = window_of(name.as_str()) {
-            commands.entity(e).insert(CarWindow(window));
+            commands.entity(e).try_insert(CarWindow(window));
         } else if PHYSICS_PREFIXES.iter().any(|p| name.as_str().starts_with(p)) {
-            commands.entity(e).insert(Visibility::Hidden);
+            commands.entity(e).try_insert(Visibility::Hidden);
         }
     }
 }
@@ -341,7 +341,7 @@ fn glaze(
             material.0 = glass.opaque.clone();
         } else {
             material.0 = glass.tinted.clone();
-            commands.entity(e).insert(Pane);
+            commands.entity(e).try_insert(Pane);
         }
     }
 }
@@ -377,7 +377,7 @@ fn break_windows(net: Res<NetGame>, mut windows: Query<(Entity, &CarWindow, &mut
 fn mark_paint(mut commands: Commands, meshes: Query<(Entity, &GltfMaterialName, &MeshMaterial3d<StandardMaterial>), Added<GltfMaterialName>>) {
     for (e, name, material) in &meshes {
         if name.0 == "paint" {
-            commands.entity(e).insert(PaintSlot(material.0.clone()));
+            commands.entity(e).try_insert(PaintSlot(material.0.clone()));
         }
     }
 }

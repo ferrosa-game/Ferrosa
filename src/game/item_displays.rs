@@ -311,7 +311,7 @@ fn add_screen_items(mut commands: Commands, items: Query<(Entity, &NetItem), Add
 fn mark_slots(mut commands: Commands, meshes: Query<(Entity, &GltfMaterialName, &MeshMaterial3d<StandardMaterial>), Added<GltfMaterialName>>, screens: Query<(), With<ScreenItem>>, parents: Query<&ChildOf>) {
     for (e, name, material) in &meshes {
         if name.0 == MATERIAL && parents.iter_ancestors(e).any(|a| screens.contains(a)) {
-            commands.entity(e).insert(ScreenSlot(material.0.clone()));
+            commands.entity(e).try_insert(ScreenSlot(material.0.clone()));
         }
     }
 }

@@ -233,7 +233,7 @@ fn mark_faces(
 ) {
     for (e, name, material) in &meshes {
         if name.0 == FACE && parents.iter_ancestors(e).any(|a| phones.contains(a)) {
-            commands.entity(e).insert(FaceSlot(material.0.clone()));
+            commands.entity(e).try_insert(FaceSlot(material.0.clone()));
         }
     }
 }
@@ -385,7 +385,7 @@ fn paint_highlight(
     for (e, mut material) in &mut meshes {
         if parents.iter_ancestors(e).any(|a| highlights.contains(a)) {
             material.0 = white.0.clone();
-            commands.entity(e).insert(NotShadowCaster);
+            commands.entity(e).try_insert(NotShadowCaster);
         }
     }
 }

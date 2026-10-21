@@ -227,7 +227,7 @@ fn mark_faces(
     for (e, name, mut material) in &mut meshes {
         match name.0.as_str() {
             LAMP => {
-                commands.entity(e).insert(LampSlot);
+                commands.entity(e).try_insert(LampSlot);
             }
             SIGN_FACE => {
                 let Some(&StreetSign(id)) = parents.iter_ancestors(e).find_map(|a| signs.get(a).ok()) else { continue };
