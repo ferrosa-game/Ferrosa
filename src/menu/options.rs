@@ -80,7 +80,7 @@ fn flag(commands: &mut Commands, parent: Entity, label: &str, config: &Config, s
 }
 
 fn number(commands: &mut Commands, parent: Entity, label: &str, value: i32, range: (i32, i32), setting: Flag) {
-    let input = ui::number_input(commands, parent, label, value, range, 120.0);
+    let input = ui::field::number_input(commands, parent, label, value, range, 120.0);
     commands.entity(input).observe(move |v: On<ValueChange<i32>>, mut config: ResMut<Config>| {
         *setting(&mut config) = v.value;
         save(&config);

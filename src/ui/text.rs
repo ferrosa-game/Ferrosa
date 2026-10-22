@@ -1,6 +1,6 @@
 use bevy::{prelude::*, text::EditableText};
 
-use crate::ui::{TEXT_SIZE, text_bundle, text_field};
+use crate::ui::{TEXT_SIZE, text_bundle, field::text_field};
 
 #[derive(Component)]
 pub(super) struct MaskOf(Entity);

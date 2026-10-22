@@ -92,12 +92,12 @@ fn build_page(mut commands: Commands, net: Res<NetGame>, mut page: ResMut<AdminP
         }
         Some(row) => {
             let ban = at(&mut commands, screen, Vec2::new(32.0, 128.0), FlexDirection::Row);
-            let time = ui::number_input(&mut commands, ban, "Time", page.time, (0, 100_000_000), FIELD_WIDTH);
+            let time = ui::field::number_input(&mut commands, ban, "Time", page.time, (0, 100_000_000), FIELD_WIDTH);
             commands.entity(time).observe(|v: On<ValueChange<i32>>, mut page: ResMut<AdminPage>| page.time = v.value);
             admin_button(&mut commands, ban, &format!("Ban {}", row.name), ROW, AdminButton::Ban);
 
             let rate = at(&mut commands, screen, Vec2::new(32.0, 176.0), FlexDirection::Row);
-            let rating = ui::number_input(&mut commands, rate, "Rating", page.rating, (0, 10_000), FIELD_WIDTH);
+            let rating = ui::field::number_input(&mut commands, rate, "Rating", page.rating, (0, 10_000), FIELD_WIDTH);
             commands.entity(rating).observe(|v: On<ValueChange<i32>>, mut page: ResMut<AdminPage>| page.rating = v.value);
             admin_button(&mut commands, rate, &format!("Set Rating {}", row.name), ROW, AdminButton::SetRating);
         }
