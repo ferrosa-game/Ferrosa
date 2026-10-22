@@ -7,28 +7,24 @@ use ferrosa_world::{
 use super::{Kind, Particle, Particles, RESTING_LIFT, bounce, byte, frame_across, random_vec3, trace};
 use crate::game::Level;
 
-const PANE_LIFE: i32 = 0xea60;
-const SETTLING: i32 = 0xe808;
-const SHARD_SIZE: f32 = 1.0 / 16.0;
-const SHARD_GRID: usize = 9;
-
 pub(super) fn shatter_window(particles: &mut Particles, c: [Vec3; 4], hit: Vec3, hit_vel: Vec3) {
     let n = (c[1] - c[0]).cross(c[2] - c[0]).normalize_or_zero();
     let (side, up) = frame_across(n);
-    let steps = (SHARD_GRID - 1) as f32;
+
+    let steps = 8.0;
     let (left, right) = ((c[3] - c[0]) / steps, (c[2] - c[1]) / steps);
     let (mut start, mut end) = (c[0], c[1]);
 
-    for _ in 0..SHARD_GRID {
+    for _ in 0..9 {
         let step = (end - start) / steps;
         let mut p = start;
 
-        for _ in 0..SHARD_GRID {
+        for _ in 0..9 {
             let near = (1.0 - p.distance(hit) * 4.0).max(1.0 / 32.0);
             let vel = (p - hit) / 32.0 + random_vec3(1.0 / 120.0, 1.0 / 480.0) + hit_vel * near / 16.0;
             let mut s = Particle::new(Kind::Shard, p, vel);
 
-            s.size = SHARD_SIZE;
+            s.size = 1.0 / 16.0;
             s.frame = [side, up, n];
             s.spin_axis = Vec3::new(byte() / 512.0 - 0.25, byte() / 512.0 - 0.25, byte() / 512.0 - 0.25).normalize_or_zero();
             s.spin = (byte() / 512.0 - 0.25) * 0.5;
@@ -62,20 +58,20 @@ pub(super) fn break_pane(particles: &mut Particles, level: &mut Level, cell: IVe
 
             t.frame = [c[k], c[(k + 1) & 3], tip];
             t.corner_vel = [Vec3::ZERO, Vec3::ZERO, hit_vel / 64.0];
-            t.life = PANE_LIFE;
+            t.life = 60000;
             t.rest = [t.frame[0].distance(t.frame[1]), t.frame[1].distance(t.frame[2]), t.frame[2].distance(t.frame[0])];
             particles.list.push(t);
         }
     }
 
-    let broken = word | 0x10000u32.checked_shl(face as u32).unwrap_or(0);
+    let broken = word | 65536u32.checked_shl(face as u32).unwrap_or(0);
     level.map.level.area.set_layer1(cell.x, cell.y, cell.z, broken);
 
     true
 }
 
 pub(super) fn settle(p: &mut Particle, map: &Map) {
-    if p.life <= SETTLING {
+    if p.life <= 59400 {
         return;
     }
 

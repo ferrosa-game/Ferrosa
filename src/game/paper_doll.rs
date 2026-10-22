@@ -13,11 +13,7 @@ use crate::{
 };
 
 const AT: Vec2 = Vec2::new(512.0, 444.0);
-const SCALE: f32 = 64.0;
 const PARTS: [usize; character_model::BONES] = [0, 0, 0, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5];
-const FULL_HEALTH: i32 = 100;
-const HALF_HEALTH: i32 = 50;
-const BLEEDING_ABOVE: i32 = 87;
 
 #[derive(Component)]
 struct DollScreen;
@@ -58,7 +54,7 @@ fn doll_bones(pose: &HumanPose, view_yaw: f32) -> [(Vec3, Quat); character_model
 }
 
 fn health_colour(health: i32) -> (f32, f32) {
-    if health >= HALF_HEALTH { (1.0, (health - HALF_HEALTH) as f32 / HALF_HEALTH as f32) } else { (health as f32 / HALF_HEALTH as f32, 0.0) }
+    if health >= 50 { (1.0, (health - 50) as f32 / 50.0) } else { (health as f32 / 50.0, 0.0) }
 }
 
 fn show_doll(
@@ -84,8 +80,8 @@ fn show_doll(
         let (pos, rot) = placed[j];
         let axis = rot * Vec3::AXES[b.shape.clamp(0, 2) as usize];
         let half = b.shape_size[0] * 0.5;
-        let screen = |p: Vec3| Vec2::new(AT.x + p.x * SCALE, AT.y - p.y * SCALE);
-        let radius = SCALE * b.shape_size[1];
+        let screen = |p: Vec3| Vec2::new(AT.x + p.x * 64.0, AT.y - p.y * 64.0);
+        let radius = 64.0 * b.shape_size[1];
 
         (*node, *turn) = {
             let (n, t) = line(screen(pos - axis * half), screen(pos + axis * half), radius * 2.0, true);
@@ -94,10 +90,10 @@ fn show_doll(
 
         let health = own.health[PARTS[j]];
         let (green, blue) = health_colour(health);
-        let filled = if h.bleeding && health > BLEEDING_ABOVE {
-            Some([1.0, 0.0, 0.0, (FULL_HEALTH - BLEEDING_ABOVE) as f32 / HALF_HEALTH as f32])
+        let filled = if h.bleeding && health > 87 {
+            Some([1.0, 0.0, 0.0, (100 - 87) as f32 / 50.0])
         } else {
-            (health < FULL_HEALTH).then(|| [1.0, green, blue, if health < HALF_HEALTH { 1.0 } else { (FULL_HEALTH - health) as f32 / HALF_HEALTH as f32 }])
+            (health < 100).then(|| [1.0, green, blue, if health < 50 { 1.0 } else { (100 - health) as f32 / 50.0 }])
         };
 
         fill.0 = filled.map_or(Color::NONE, hud::colour);

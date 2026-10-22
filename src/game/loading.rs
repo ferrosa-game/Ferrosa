@@ -18,7 +18,6 @@ use crate::{
     ui::{self, Shortcut},
 };
 
-const DEFAULT_MAP: &str = "round";
 const DEFAULT_STREETS: (i32, i32, i32, i32) = (1024, 1024, 2600, 2600);
 const BACK: Vec2 = Vec2::new(320.0, 44.0);
 
@@ -102,7 +101,7 @@ fn load(name: String) -> Result<Loaded, String> {
 }
 
 fn start_loading(mut commands: Commands, sync: Option<Res<ServerSync>>) {
-    let name = sync.map_or_else(|| DEFAULT_MAP.to_string(), |s| s.map.clone());
+    let name = sync.map_or_else(|| "round".to_string(), |s| s.map.clone());
 
     commands.spawn((
         Node {
@@ -116,7 +115,7 @@ fn start_loading(mut commands: Commands, sync: Option<Res<ServerSync>>) {
         },
         LoadingScreen,
         DespawnOnExit(Screen::Loading),
-        children![(Text::new(format!("Loading {name}...")), LoadingText)],
+        children![(Text::new(format!("Loading map: {name}...")), LoadingText)],
     ));
 
     commands.insert_resource(Loading { map: name.clone(), task: AsyncComputeTaskPool::get().spawn(async move { load(name) }) });

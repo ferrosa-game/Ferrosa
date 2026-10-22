@@ -6,8 +6,6 @@ use bevy::{
 use super::{EffectAssets, Kind, Particles, empty_mesh};
 use crate::game::camera::GameCamera;
 
-const SMOKE_COLOUR: [f32; 3] = [1.0, 1.0, 0.75];
-
 #[derive(Default)]
 struct Batch {
     positions: Vec<[f32; 3]>,
@@ -74,7 +72,7 @@ pub(super) fn draw_particles(
         let corners = |side: Vec3, up: Vec3, s: f32| [p.pos - side * s + up * s, p.pos + side * s + up * s, p.pos + side * s - up * s, p.pos - side * s - up * s];
 
         match p.kind {
-            Kind::Smoke => spots.quad(corners(right, up, p.size), back, [SMOKE_COLOUR[0], SMOKE_COLOUR[1], SMOKE_COLOUR[2], fade]),
+            Kind::Smoke => spots.quad(corners(right, up, p.size), back, [1.0, 1.0, 0.75, fade]),
             Kind::Blood => blood.quad(corners(right, up, p.size), back, [1.0, 1.0, 1.0, fade]),
             Kind::Shard => {
                 let c = corners(p.frame[0], p.frame[1], p.size);

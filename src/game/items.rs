@@ -21,15 +21,7 @@ use super::{
 };
 use crate::{character_model::HumanPose, menu::Screen};
 
-const FIRST_POCKET: u32 = 2;
-const BACK: f32 = 0.25;
 const NOTES: [&str; 7] = ["one", "five", "ten", "twenty", "fifty", "hundred", "thousand"];
-const BILL_GAP: f32 = 7.0 / 512.0;
-const FAN: f32 = 1.0 / 32.0;
-const FACE: &str = "skin";
-const FACE_SHIFT: f32 = 3.0 / 16.0;
-const OTHER_FACE: i32 = 1;
-const REACH: f32 = 1.5;
 
 #[derive(Resource)]
 pub struct ItemTypes(pub Vec<ItemType>);
@@ -99,7 +91,7 @@ fn place(item: &Item) -> Transform {
 }
 
 fn stowed(item: &Item) -> bool {
-    item.parent_human >= 0 && item.parent_slot > FIRST_POCKET
+    item.parent_human >= 0 && item.parent_slot > 2
 }
 
 fn out_in_world(net: &NetGame, item: &Item) -> bool {
@@ -109,7 +101,7 @@ fn out_in_world(net: &NetGame, item: &Item) -> bool {
 }
 
 fn on_back(net: &NetGame, item: &Item) -> Option<usize> {
-    let human = usize::try_from(item.parent_human).ok().filter(|_| item.parent_slot >= FIRST_POCKET)?;
+    let human = usize::try_from(item.parent_human).ok().filter(|_| item.parent_slot >= 2)?;
 
     net.humans.get(human).is_some_and(|h| h.active).then_some(human)
 }
@@ -121,10 +113,6 @@ fn cash_stack(item: &Item) -> CashStack {
     };
 
     CashStack { bills, picked, notes, hand: (item.parent_human >= 0).then_some(item.parent_slot) }
-}
-
-fn phone_face(item: &Item) -> PhoneFace {
-    PhoneFace(item.phone.2 == OTHER_FACE)
 }
 
 fn item_model(assets: &AssetServer, types: &ItemTypes, kind: ItemKind) -> Option<Handle<WorldAsset>> {
@@ -155,7 +143,7 @@ fn sync_items(
         }
 
         if let Some(mut face) = face {
-            face.set_if_neq(phone_face(item));
+            face.set_if_neq(PhoneFace(item.phone.2 == 1));
         }
 
         if places.last_tick() != Some(item.track.tick) {
@@ -181,7 +169,7 @@ fn sync_items(
 
         match kind {
             ItemKind::CashWorld => entity.insert((cash_stack(item), ItemModel(model))),
-            ItemKind::Phone => entity.insert((phone_face(item), WorldAssetRoot(model))),
+            ItemKind::Phone => entity.insert((PhoneFace(item.phone.2 == 1), WorldAssetRoot(model))),
             _ => entity.insert(WorldAssetRoot(model)),
         };
 
@@ -200,18 +188,19 @@ fn stack_cash(mut commands: Commands, stacks: Query<(Entity, Ref<CashStack>, &It
         children.into_iter().flatten().for_each(|&c| commands.entity(c).despawn());
 
         let fan = match stack.hand {
-            Some(0) => -FAN,
-            Some(1) => FAN,
+            Some(0) => -(1.0 / 32.0),
+            Some(1) => 1.0 / 32.0,
             _ => 0.0,
         };
+
         let turn = Quat::from_rotation_y(fan * FRAC_PI_2);
-        let mut at = Transform::from_translation(Vec3::Y * stack.bills as f32 * BILL_GAP * 0.5);
+        let mut at = Transform::from_translation(Vec3::Y * stack.bills as f32 * (7.0 / 512.0) * 0.5);
 
         for k in 0..=stack.bills.max(0) {
             let note = (stack.notes >> (k * 3) & 7) as usize;
             commands.spawn((Bill(note), WorldAssetRoot(model.0.clone()), at, ChildOf(e)));
 
-            at.translation -= at.rotation * Vec3::Y * BILL_GAP;
+            at.translation -= at.rotation * Vec3::Y * (7.0 / 512.0);
 
             if stack.hand.is_some() {
                 at.rotation *= turn;
@@ -232,7 +221,7 @@ fn mark_faces(
     parents: Query<&ChildOf>,
 ) {
     for (e, name, material) in &meshes {
-        if name.0 == FACE && parents.iter_ancestors(e).any(|a| phones.contains(a)) {
+        if name.0 == "skin" && parents.iter_ancestors(e).any(|a| phones.contains(a)) {
             commands.entity(e).try_insert(FaceSlot(material.0.clone()));
         }
     }
@@ -271,7 +260,7 @@ fn show_faces(
             continue;
         }
 
-        let shift = |m: &mut StandardMaterial| m.uv_transform = Affine2::from_translation(Vec2::new(FACE_SHIFT, 0.0));
+        let shift = |m: &mut StandardMaterial| m.uv_transform = Affine2::from_translation(Vec2::new(3.0 / 16.0, 0.0));
         let wanted = if face.0 { changed(&mut cache, &mut materials, &slot.0, 0, shift) } else { Some(slot.0.clone()) };
 
         if let Some(wanted) = wanted.filter(|w| *w != material.0) {
@@ -304,7 +293,7 @@ fn carry_on_back(mut items: Query<(&OnBack, &mut Transform), Without<NetHuman>>,
         let (torso, turn) = bone_at(at.translation, pose, BoneId::Torso.index());
         let [x, y, z] = [Vec3::X, Vec3::Y, Vec3::Z].map(|axis| turn * axis);
 
-        *transform = Transform::from_translation(torso + z * BACK).with_rotation(Quat::from_mat3(&Mat3::from_cols(x, -z, y)));
+        *transform = Transform::from_translation(torso + z * 0.25).with_rotation(Quat::from_mat3(&Mat3::from_cols(x, -z, y)));
     }
 }
 
@@ -328,7 +317,7 @@ fn reachable_item(net: &NetGame, types: &ItemTypes, (eyes, turn): (Vec3, Quat)) 
         return None;
     }
 
-    let end = eyes - turn * Vec3::Z * REACH;
+    let end = eyes - turn * Vec3::Z * 1.5;
     let (target, _) = net
         .items
         .iter()

@@ -22,8 +22,6 @@ use crate::{
     }, menu::Screen, steam::Steam,
 };
 
-const SPACING: Duration = Duration::from_secs(4);
-
 #[derive(Clone, PartialEq, Debug)]
 struct Activity {
     details: String,
@@ -168,7 +166,7 @@ fn push_steam_presence(screen: Res<State<Screen>>, net: Option<Res<NetGame>>, ti
     let activity = wanted(screen.get(), net.as_deref(), &presence);
     let elapsed = time.elapsed();
 
-    if presence.last_steam_send.is_some_and(|t| elapsed - t < SPACING) {
+    if presence.last_steam_send.is_some_and(|t| elapsed - t < Duration::from_secs(4)) {
         return
     }
 
@@ -192,7 +190,7 @@ fn push_discord_presence(time: Res<Time<Real>>, screen: Res<State<Screen>>, net:
     let activity = wanted(screen.get(), net.as_deref(), &presence);
     let elapsed = time.elapsed();
 
-    if presence.sent.as_ref() == Some(&activity) || presence.last_discord_send.is_some_and(|t| elapsed - t < SPACING) {
+    if presence.sent.as_ref() == Some(&activity) || presence.last_discord_send.is_some_and(|t| elapsed - t < Duration::from_secs(4)) {
         return;
     }
 

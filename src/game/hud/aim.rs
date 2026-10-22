@@ -11,7 +11,6 @@ use crate::game::{
 };
 
 const AIM_PIVOT: Vec2 = Vec2::new(608.0, 352.0);
-const AIM_NEEDLE: f32 = 64.0;
 
 #[derive(Component)]
 pub(super) struct Dot;
@@ -65,7 +64,7 @@ pub(super) fn show_crosshair(
 
 pub(super) fn show_aim(net: Res<NetGame>, input: Res<InputState>, mut lines: Query<(&AimLine, &mut Node, &mut UiTransform, &mut Visibility)>) {
     let pitch = own(&net).filter(|_| net.game_state != GameState::Restarting && input.aiming()).map(|(p, _, _)| p.free_look_pitch);
-    let needle = |a: f32| AIM_PIVOT + Vec2::new(-a.cos() * AIM_NEEDLE * 0.5, a.sin() * AIM_NEEDLE);
+    let needle = |a: f32| AIM_PIVOT + Vec2::new(-a.cos() * 64.0 * 0.5, a.sin() * 64.0);
     let tip = |pitch: f32, scale: f32| needle(15.0 * pitch * scale);
 
     for (&AimLine(k), mut node, mut turn, mut v) in &mut lines {

@@ -14,13 +14,7 @@ use super::{
 };
 use crate::{audio::Speakers, menu::Screen};
 
-const SLOTS: usize = 8;
-const RANGE: f32 = 256.0;
-const ENGINE_RADIUS: f32 = 10.0;
-const EASE: f32 = 0.125;
 const SKIDDING: f32 = 1.0 / 16.0;
-const IDLE_RPM: i32 = 0x63;
-const IDLE_PITCH: f32 = 153.0 / 512.0;
 
 #[derive(Resource)]
 struct EngineClips {
@@ -87,7 +81,6 @@ fn hear_engines(
 
     let listener = (ears.left + ears.right) * 0.5;
     let place = |v: usize| vehicles.iter().find(|(nv, _)| nv.index == v).map(|(_, t)| *t);
-    let distance = |v: usize| place(v).map_or(f32::MAX, |t| t.translation.distance(listener));
     let sight = |from: Vec3| level.as_ref().map_or(1.0, |l| line_of_sight(l, from, listener));
     let running = |v: usize| net.vehicles.get(v).is_some_and(|v| v.active && heard(v.kind) && v.engine_rpm as i32 > 0);
 
@@ -98,19 +91,7 @@ fn hear_engines(
             continue;
         }
 
-        let fresh = Slot { vehicle: i, engine: None, tires: None, engine_volume: 0.0, tire_volume: 0.0 };
-
-        if engines.0.len() < SLOTS {
-            engines.0.push(fresh);
-            continue;
-        }
-
-        let here = distance(i);
-        let farther = engines.0.iter().enumerate().map(|(j, s)| (j, distance(s.vehicle))).filter(|&(_, d)| d > here).min_by(|a, b| a.1.total_cmp(&b.1));
-
-        if let Some((j, _)) = farther {
-            engines.0[j] = fresh;
-        }
+        engines.0.push(Slot { vehicle: i, engine: None, tires: None, engine_volume: 0.0, tire_volume: 0.0 });
     }
 
     for s in &mut engines.0 {
@@ -119,7 +100,7 @@ fn hear_engines(
             continue;
         };
 
-        if !running(s.vehicle) || at.translation.distance(listener) >= RANGE {
+        if !running(s.vehicle) || at.translation.distance(listener) >= 256.0 {
             (s.engine, s.tires) = (None, None);
             continue;
         }
@@ -130,16 +111,16 @@ fn hear_engines(
         let rpm = v.engine_rpm as i32;
 
         if s.engine.is_none() {
-            s.engine = start(&speakers, &clips.engine, front, ENGINE_RADIUS, &ears, 0.5);
+            s.engine = start(&speakers, &clips.engine, front, 10.0, &ears, 0.5);
         }
 
         if let Some(engine) = s.engine.as_mut() {
-            let pitch = if rpm > IDLE_RPM { rpm as f32 / 2048.0 + 0.25 } else { IDLE_PITCH };
+            let pitch = if rpm > 99 { rpm as f32 / 2048.0 + 0.25 } else { 153.0 / 512.0 };
             let volume = (rpm as f32 / 64.0).min(0.5) * 0.5;
 
-            s.engine_volume += (sight(front) * volume - s.engine_volume) * EASE;
+            s.engine_volume += (sight(front) * volume - s.engine_volume) * 0.125;
 
-            engine.place(front, ENGINE_RADIUS, &ears);
+            engine.place(front, 10.0, &ears);
             engine.player().set_speed(pitch);
             engine.player().set_volume(s.engine_volume * ears.volume);
         }
@@ -154,7 +135,7 @@ fn hear_engines(
         }
 
         if let Some(tires) = s.tires.as_mut() {
-            s.tire_volume += (sight(rear) * skid.min(1.0) - s.tire_volume) * EASE;
+            s.tire_volume += (sight(rear) * skid.min(1.0) - s.tire_volume) * 0.125;
 
             tires.place(rear, 10.0, &ears);
             tires.player().set_volume(s.tire_volume * ears.volume);

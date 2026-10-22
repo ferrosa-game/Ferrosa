@@ -5,20 +5,14 @@ use bevy::{
 };
 
 use crate::{
-    character_model::SHADOW_ONLY,
     game::netgame::{NetGame, sync::ServerSync},
     menu::Screen,
 };
 
-const DEFAULT_SUN_ANGLE: f32 = 0.8;
 const WORLD_HOUR: f32 = 216_000.0;
 const WORLD_DAY: f32 = 24.0 * WORLD_HOUR;
 const CLOCK_BASE: f32 = 11.0 * WORLD_HOUR;
 const FILL: Color = Color::srgb(1.0, 0.85, 0.65);
-const FILL_BRIGHTNESS: f32 = 6000.0;
-const SHADOW_NEAR: f32 = 30.0;
-const SHADOW_FAR: f32 = 3000.0;
-const SHADOW_MAP: usize = 4096;
 
 pub struct SkyPlugin;
 
@@ -48,13 +42,13 @@ fn sun_direction(angle: f32) -> Vec3 {
 }
 
 fn spawn_sky(mut commands: Commands, sync: Option<Res<ServerSync>>, mut media: ResMut<Assets<ScatteringMedium>>) {
-    let angle = sync.map_or(DEFAULT_SUN_ANGLE, |s| s.sun_angle);
+    let angle = sync.map_or(0.8, |s| s.sun_angle);
 
     commands.spawn((
         DirectionalLight { illuminance: lux::RAW_SUNLIGHT, shadow_maps_enabled: true, ..default() },
-        RenderLayers::from_layers(&[0, SHADOW_ONLY]),
+        RenderLayers::from_layers(&[0, 1]),
         SunDisk::EARTH,
-        CascadeShadowConfigBuilder { first_cascade_far_bound: SHADOW_NEAR, maximum_distance: SHADOW_FAR, ..default() }.build(),
+        CascadeShadowConfigBuilder { first_cascade_far_bound: 30.0, maximum_distance: 3000.0, ..default() }.build(),
         Transform::default().looking_to(-sun_direction(angle), Vec3::Y),
         Sun(angle),
         DespawnOnExit(Screen::InGame),
@@ -62,6 +56,6 @@ fn spawn_sky(mut commands: Commands, sync: Option<Res<ServerSync>>, mut media: R
 
     commands.spawn((Atmosphere::earth(media.add(ScatteringMedium::earth(256, 256))), DespawnOnExit(Screen::InGame)));
 
-    commands.insert_resource(DirectionalLightShadowMap { size: SHADOW_MAP });
-    commands.insert_resource(GlobalAmbientLight { color: FILL, brightness: FILL_BRIGHTNESS, ..default() });
+    commands.insert_resource(DirectionalLightShadowMap { size: 4096 });
+    commands.insert_resource(GlobalAmbientLight { color: FILL, brightness: 6000.0, ..default() });
 }

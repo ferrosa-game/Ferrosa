@@ -18,10 +18,7 @@ use crate::{
 };
 
 const WHITE: [f32; 4] = [1.0; 4];
-const WANTED: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
-const TICKS_PER_HOUR: u32 = 216000;
-const TICKS_PER_MINUTE: u32 = 3600;
-const LUNCH: std::ops::RangeInclusive<u32> = 0x278d00..=0x278d00 + 0x34bbf;
+const LUNCH: std::ops::RangeInclusive<u32> = 2592000..=2592000 + 215999;
 const MISSION_SPOTS: [&str; 8] = ["Hondo Park", "Rio Granary", "Isle of Burgers", "Park above the Kamel Building", "Bobson Dugnutt Museum", "The Mall", "Gas Station", "Red Cube Park"];
 const ROLES: [(&str, [f32; 3]); 3] = [("You are a Civilian", [0.75, 0.75, 0.75]), ("You are the Eliminator", [0.75, 0.0, 0.0]), ("You are the Protector", [0.75, 0.75, 1.0])];
 
@@ -121,12 +118,12 @@ fn world(net: &NetGame) -> bool {
 }
 
 fn clock(time: u32) -> String {
-    let hour = match time / TICKS_PER_HOUR % 12 {
+    let hour = match time / (60 * 60 * 60) % 12 {
         0 => 12,
         h => h,
     };
 
-    format!("{hour}:{:02}", time / TICKS_PER_MINUTE % 60)
+    format!("{hour}:{:02}", time / (60 * 60) % 60)
 }
 
 fn show_world_hud(
@@ -141,7 +138,7 @@ fn show_world_hud(
         let mut lines = vec![line(format!("${}", p.money), Vec2::new(4.0, 4.0), align::TOP_LEFT, 24.0, WHITE)];
 
         if p.criminal_rating > 0 {
-            lines.push(line(format!("Wanted Level:{}", p.criminal_rating), Vec2::new(768.0, 4.0), align::TOP_LEFT, 24.0, WANTED));
+            lines.push(line(format!("Wanted Level:{}", p.criminal_rating), Vec2::new(768.0, 4.0), align::TOP_LEFT, 24.0, [1.0, 0.0, 0.0, 1.0]));
         }
 
         lines

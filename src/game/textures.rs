@@ -5,12 +5,6 @@ use bevy::{
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
 
-pub const ATLAS_SIZE: u32 = 0x80;
-const WINDOW: [u8; 3] = [0x70, 0x80, 0x90];
-const WINDOW_ROUGHNESS: u8 = 0x10;
-const YELLOW: [u8; 3] = [0xff, 0xff, 0x20];
-const WHITE: [u8; 3] = [0xff; 3];
-
 #[derive(Clone)]
 pub struct Pixels {
     pub width: u32,
@@ -139,7 +133,7 @@ fn marking(layer: usize, row: i32, col: i32) -> Option<[u8; 3]> {
         || (layer == 3 && (span(row, 16, 15) || span(row, 96, 15)))
         || (layer == 8 && (span(col, 16, 15) || span(col, 96, 15)));
 
-    if yellow { Some(YELLOW) } else if white { Some(WHITE) } else { None }
+    if yellow { Some([255, 255, 32]) } else if white { Some([255, 255, 255]) } else { None }
 }
 
 pub fn particle() -> Pixels {
@@ -171,7 +165,7 @@ pub fn road_markings(asphalt: &Pixels, layer: usize) -> Pixels {
 }
 
 pub fn window_facade(wall: Option<&Pixels>, [x, w, y, h]: [f32; 4]) -> (Pixels, Pixels) {
-    let n = ATLAS_SIZE;
+    let n = 128;
     let inside = |v: u32, lo: f32, len: f32| (lo..lo + len).contains(&((v as f32 + 0.5) / n as f32));
     let (mut colour, mut surface) = (Vec::with_capacity((n * n * 4) as usize), Vec::with_capacity((n * n * 4) as usize));
 
@@ -182,10 +176,10 @@ pub fn window_facade(wall: Option<&Pixels>, [x, w, y, h]: [f32; 4]) -> (Pixels, 
                 let i = (((row * p.height / n) * p.width + col * p.width / n) * 4) as usize;
                 [p.rgba[i], p.rgba[i + 1], p.rgba[i + 2]]
             });
-            let c = if glass { WINDOW } else { wall };
+            let c = if glass { [112, 128, 144] } else { wall };
 
             colour.extend_from_slice(&[c[0], c[1], c[2], 255]);
-            surface.extend_from_slice(&if glass { [0, WINDOW_ROUGHNESS, 255, 255] } else { [0, 230, 0, 255] });
+            surface.extend_from_slice(&if glass { [0, 16, 255, 255] } else { [0, 230, 0, 255] });
         }
     }
 

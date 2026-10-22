@@ -4,11 +4,6 @@ use ferrosa_world::{
     map::Map,
 };
 
-pub const BUILTIN: usize = 4;
-pub const ASPHALT: usize = 1;
-pub const ATLAS: usize = 3;
-pub const MARKINGS: usize = 10;
-
 const UP_AXES: [(Vec3, Vec3); 4] = [(Vec3::X, Vec3::NEG_Z), (Vec3::Z, Vec3::X), (Vec3::NEG_X, Vec3::Z), (Vec3::NEG_Z, Vec3::NEG_X)];
 
 const CUBE_FACES: [[usize; 4]; 6] = [[3, 2, 1, 0], [7, 6, 2, 3], [4, 7, 3, 0], [5, 4, 0, 1], [6, 5, 1, 2], [4, 5, 6, 7]];
@@ -26,8 +21,6 @@ const CUBE_NORMALS: [Vec3; 6] = [Vec3::NEG_Y, Vec3::Z, Vec3::NEG_X, Vec3::NEG_Z,
 const CUBE_U: [Vec3; 6] = [Vec3::NEG_X, Vec3::X, Vec3::Z, Vec3::NEG_X, Vec3::NEG_Z, Vec3::X];
 const CUBE_V: [Vec3; 6] = [Vec3::NEG_Z, Vec3::Y, Vec3::Y, Vec3::Y, Vec3::Y, Vec3::Z];
 
-const MATERIAL_SCALE: f32 = 0.25;
-
 #[derive(Default, Clone)]
 pub struct Part {
     pub positions: Vec<[f32; 3]>,
@@ -38,7 +31,7 @@ pub struct Part {
 
 fn decode_slot(w: u16, cube: bool) -> (usize, usize) {
     let (mat, layer) = if (w >> 8) & 0x40 != 0 { (w & 0xff, (w >> 8) & 0x1f) } else { (w, 0) };
-    if cube && (mat as i16) < 0 { (ATLAS, (mat & 0x3ff) as usize) } else { (mat as usize, layer as usize) }
+    if cube && (mat as i16) < 0 { (3, (mat & 0x3ff) as usize) } else { (mat as usize, layer as usize) }
 }
 
 pub struct Block {
@@ -72,9 +65,9 @@ struct Builder<'a> {
 impl Builder<'_> {
     fn resolve(&self, material: usize, layer: usize) -> Target {
         match material {
-            ATLAS if !self.interior && layer < self.atlas.len() => Target::Facade(layer),
-            ATLAS => Target::Part(self.atlas.get(layer).map_or(ATLAS, |e| e.0 as usize)),
-            ASPHALT if (1..=MARKINGS).contains(&layer) => Target::Part(self.marked + layer - 1),
+            3 if !self.interior && layer < self.atlas.len() => Target::Facade(layer),
+            3 => Target::Part(self.atlas.get(layer).map_or(3, |e| e.0 as usize)),
+            1 if (1..=10).contains(&layer) => Target::Part(self.marked + layer - 1),
             _ => Target::Part(material),
         }
     }
@@ -137,7 +130,7 @@ impl Builder<'_> {
 
             for (k, &c) in CUBE_FACES[r].iter().enumerate() {
                 let p = bs * CUBE_CORNERS[c] + local;
-                uvs[k] = [p.dot(u) * MATERIAL_SCALE, p.dot(w) * MATERIAL_SCALE];
+                uvs[k] = [p.dot(u) * 0.25, p.dot(w) * 0.25];
                 corners[k] = chunk + p + origin;
             }
 
@@ -195,10 +188,10 @@ pub fn panes(map: &Map, origin: IVec3) -> Part {
 pub fn build(map: &Map) -> Built {
     let area = &map.level.area;
     let bs = area.block_size;
-    let count = BUILTIN + map.level.texture_data.len();
+    let count = 4 + map.level.texture_data.len();
     let empty = |n: usize| (0..n).map(|_| Part::default()).collect::<Vec<_>>();
-    let new_block = |origin: IVec3, centre: Vec3| Block { origin, centre, facades: empty(map.level.atlas.len()), interior: empty(count + MARKINGS), panes: Part::default() };
-    let mut b = Builder { parts: empty(count + MARKINGS), atlas: &map.level.atlas, marked: count, block: new_block(IVec3::ZERO, Vec3::ZERO), interior: false };
+    let new_block = |origin: IVec3, centre: Vec3| Block { origin, centre, facades: empty(map.level.atlas.len()), interior: empty(count + 10), panes: Part::default() };
+    let mut b = Builder { parts: empty(count + 10), atlas: &map.level.atlas, marked: count, block: new_block(IVec3::ZERO, Vec3::ZERO), interior: false };
     let mut blocks = Vec::new();
 
     for (origin, record) in area.blocks() {
@@ -227,7 +220,7 @@ pub fn build(map: &Map) -> Built {
                 && let Some(mesh) = map.level.meshes.get(v & 0xffff)
             {
                 let bytes = &record.textures[cell];
-                let word = |w: u16| if (w as i16) < 0 { (ATLAS, (w & 0x3ff) as usize) } else { ((w & 0xff) as usize, 0) };
+                let word = |w: u16| if (w as i16) < 0 { (3, (w & 0x3ff) as usize) } else { ((w & 0xff) as usize, 0) };
                 let slot = |code: usize| if code > 7 { Some(word(*slots.get(code - 8)?)) } else { Some((bytes[code] as usize, 0)) };
                 b.mesh(mesh, chunk, local, area.origin, bs, ((v >> 24) & 3) as usize, &slot);
             }

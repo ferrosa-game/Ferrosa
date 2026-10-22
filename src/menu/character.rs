@@ -9,7 +9,7 @@ use bevy::{
 
 use crate::{
     config::{Config, config_path},
-    character_model::{HAIRS, HEADS, HumanExtent, HumanLook, HumanPose},
+    character_model::{HumanExtent, HumanLook, HumanPose},
     menu::{Screen, back_button, gap, page, text},
     ui,
 };
@@ -87,9 +87,9 @@ pub(super) fn character(mut commands: Commands, look: Res<PlayerLook>, preview: 
     );
 
     let sliders: [(&str, i32, i32, fn(&mut PlayerLook) -> &mut i32); 5] = [
-        ("Head", look.head, HEADS as i32 - 1, |l| &mut l.head),
+        ("Head", look.head, 5 - 1, |l| &mut l.head),
         ("Eyes", look.eyes, 7, |l| &mut l.eyes),
-        ("Hair", look.hair, HAIRS as i32 - 1, |l| &mut l.hair),
+        ("Hair", look.hair, 9 - 1, |l| &mut l.hair),
         ("Hair Color", look.hair_colour, 0xb, |l| &mut l.hair_colour),
         ("Skin", look.skin, 5, |l| &mut l.skin),
     ];

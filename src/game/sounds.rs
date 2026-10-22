@@ -12,23 +12,12 @@ use super::{
 };
 use crate::{audio::Speakers, config::Config, menu::Screen};
 
-const EAR_GAP: f32 = 0.2;
 const RATE: u32 = 48000;
 const GUNS: [(ItemKind, &str); 5] = [(ItemKind::Ak47, "ak47"), (ItemKind::M16, "m16"), (ItemKind::Mp5, "mp5"), (ItemKind::Uzi, "uzi"), (ItemKind::Pistol, "pistol")];
-const SHOTS: usize = 6;
-const RICOCHETS: usize = 8;
 const NEAR: f32 = 1.0;
 const SHORT: f32 = 10.0;
 const FAR: f32 = 32.0;
-const KEYS: f32 = 0.25;
-const SHELL: f32 = 2.0;
-const RICOCHET: i32 = 0;
-const BODY: i32 = 1;
-const METAL: i32 = 2;
 const GLASS_PITCH: (f32, f32) = (0.75, 0.75 + 255.0 / 512.0);
-const KEY_LENGTH: usize = 0x4000;
-const BUSY_LENGTH: usize = 0x5622;
-const FADE: usize = 0x20;
 
 #[derive(Clone)]
 struct Clip {
@@ -116,7 +105,7 @@ fn load_sounds(mut commands: Commands) {
     let silence = || tone_buffer(vec![0.0]);
     let file = |name: &str, radius: f32| Clip { buffer: decode(&Path::new("data/sound").join(format!("{name}.wav"))).unwrap_or_else(silence), radius };
     let numbered = |stem: &str, count: usize, radius: f32| (1..=count).map(|k| file(&format!("{stem}{k:02}"), radius)).collect::<Vec<_>>();
-    let tone = |key: usize| Clip { buffer: tone_buffer(dial_tone(key)), radius: KEYS };
+    let tone = |key: usize| Clip { buffer: tone_buffer(dial_tone(key)), radius: 0.25 };
 
     let mut server: HashMap<u8, Clip> = [
         (Sound::CarCrash, file("carcrash02", FAR)),
@@ -138,36 +127,36 @@ fn load_sounds(mut commands: Commands) {
     server.insert(Sound::PhoneBusy as u8, tone(10));
 
     commands.insert_resource(GameSounds {
-        guns: GUNS.iter().map(|&(kind, name)| (kind, numbered(&format!("{name}_fire"), SHOTS, SHORT))).collect(),
-        ricochets: numbered("ricochet", RICOCHETS, SHORT),
+        guns: GUNS.iter().map(|&(kind, name)| (kind, numbered(&format!("{name}_fire"), 6, SHORT))).collect(),
+        ricochets: numbered("ricochet", 8, SHORT),
         body: numbered("bullethitbody", 2, SHORT),
         metal: numbered("bullethitmetal", 2, SHORT),
         glass: file("glassbreak01", SHORT),
         explosion: file("explosion01", FAR),
-        shell: file("shell_hit_cement", SHELL),
+        shell: file("shell_hit_cement", 2.0),
         server,
     });
 }
 
 fn dial_tone(key: usize) -> Vec<f32> {
     let (high, low, length) = match key {
-        1 => (1209.0, 697.0, KEY_LENGTH),
-        2 => (1336.0, 697.0, KEY_LENGTH),
-        3 => (1477.0, 697.0, KEY_LENGTH),
-        4 => (1209.0, 770.0, KEY_LENGTH),
-        5 => (1336.0, 770.0, KEY_LENGTH),
-        6 => (1477.0, 770.0, KEY_LENGTH),
-        7 => (1209.0, 852.0, KEY_LENGTH),
-        8 => (1336.0, 852.0, KEY_LENGTH),
-        9 => (1477.0, 852.0, KEY_LENGTH),
-        0 => (1336.0, 941.0, KEY_LENGTH),
-        _ => (480.0, 620.0, BUSY_LENGTH),
+        1 => (1209.0, 697.0, 16384),
+        2 => (1336.0, 697.0, 16384),
+        3 => (1477.0, 697.0, 16384),
+        4 => (1209.0, 770.0, 16384),
+        5 => (1336.0, 770.0, 16384),
+        6 => (1477.0, 770.0, 16384),
+        7 => (1209.0, 852.0, 16384),
+        8 => (1336.0, 852.0, 16384),
+        9 => (1477.0, 852.0, 16384),
+        0 => (1336.0, 941.0, 16384),
+        _ => (480.0, 620.0, 22050),
     };
     let step = |f: f64| f * 2.0 * PI / RATE as f64;
 
     (0..length)
-        .map(|i| {
-            let fade = 0.9f64.powi(i.saturating_sub(length - FADE) as i32);
+        .map(|i: i32| {
+            let fade = 0.9f64.powi(i.saturating_sub(length - 32));
             let t = i as f64;
             (((step(high) * t).sin() + (step(low) * t).sin()) * fade * 0.25) as f32
         })
@@ -176,7 +165,7 @@ fn dial_tone(key: usize) -> Vec<f32> {
 
 fn hear(camera: Option<Single<&Transform, With<GameCamera>>>, config: Res<Config>, net: Option<Res<NetGame>>, mut ears: ResMut<Ears>) {
     let Some(camera) = camera else { return };
-    let side = camera.right() * EAR_GAP * 0.5;
+    let side = camera.right() * 0.2 * 0.5;
     let ending = net.filter(|n| n.game_state == GameState::InGame).map_or(1.0, |n| (n.timer as f32 / GAME_FPS).clamp(0.0, 1.0));
     let volume = if config.sound != 0 { config.sound_volume as f32 / 100.0 * ending } else { 0.0 };
 
@@ -195,9 +184,9 @@ fn play_sounds(mut happenings: MessageReader<NetEvent>, sounds: Option<Res<GameS
             NetEvent::Gunshot { kind, pos, .. } => (kind.and_then(|k| sounds.guns.get(&k)).and_then(|c| pick(c)), pos, 1.0, 1.0),
             NetEvent::BulletHit { hit, pos, .. } => {
                 let clips = match hit {
-                    RICOCHET => &sounds.ricochets[..],
-                    BODY => &sounds.body,
-                    METAL => &sounds.metal,
+                    0 => &sounds.ricochets[..],
+                    1 => &sounds.body,
+                    2 => &sounds.metal,
                     _ => &[],
                 };
                 (pick(clips), pos, 1.0, 1.0)

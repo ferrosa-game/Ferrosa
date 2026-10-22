@@ -13,16 +13,6 @@ use crate::{
     menu::Screen,
 };
 
-const CTRL_FLAG: u32 = 0x100;
-const NEW_LINE: u32 = 0xa;
-const BACKSPACE: u32 = 8;
-const SPACE: u32 = 0x20;
-const ARROW_UP: u32 = 0x10;
-const ARROW_DOWN: u32 = 0x11;
-const ARROW_LEFT: u32 = 0x12;
-const ARROW_RIGHT: u32 = 0x13;
-const RIGHT_HAND: usize = 0;
-
 #[derive(Resource, Default)]
 pub struct AtComputer(pub Option<i32>);
 
@@ -48,7 +38,7 @@ fn find_computer(net: Option<Res<NetGame>>, mouse: Res<ButtonInput<MouseButton>>
     let computer = net.filter(|_| playing && !mouse.pressed(MouseButton::Right)).and_then(|net| {
         let p = net.me()?;
         let human = usize::try_from(p.human).ok().and_then(|h| net.humans.get(h)).filter(|h| h.alive)?;
-        let &item = human.inventory[RIGHT_HAND].first()?;
+        let &item = human.inventory[0].first()?;
 
         (usize::try_from(item).ok().and_then(|i| net.items.get(i))?.kind == Some(ItemKind::Computer)).then_some(item)
     });
@@ -111,7 +101,7 @@ fn computer_key(key: KeyCode, shift: bool, ctrl: bool) -> Option<u32> {
     if let Some(c) = character(key) {
         return Some(if c.is_ascii_lowercase() {
             let upper = c.to_ascii_uppercase() as u32;
-            if ctrl { upper | CTRL_FLAG } else { upper }
+            if ctrl { upper | 256 } else { upper }
         } else if shift {
             shifted(c) as u32
         } else {
@@ -120,13 +110,13 @@ fn computer_key(key: KeyCode, shift: bool, ctrl: bool) -> Option<u32> {
     }
 
     Some(match key {
-        KeyCode::Space => SPACE,
-        KeyCode::Enter | KeyCode::NumpadEnter => NEW_LINE,
-        KeyCode::Backspace => BACKSPACE,
-        KeyCode::ArrowUp => ARROW_UP,
-        KeyCode::ArrowDown => ARROW_DOWN,
-        KeyCode::ArrowLeft => ARROW_LEFT,
-        KeyCode::ArrowRight => ARROW_RIGHT,
+        KeyCode::Space => 32,
+        KeyCode::Enter | KeyCode::NumpadEnter => 10,
+        KeyCode::Backspace => 8,
+        KeyCode::ArrowUp => 16,
+        KeyCode::ArrowDown => 17,
+        KeyCode::ArrowLeft => 18,
+        KeyCode::ArrowRight => 19,
         _ => return None,
     })
 }

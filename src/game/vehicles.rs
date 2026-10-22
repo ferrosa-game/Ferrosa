@@ -24,12 +24,6 @@ use crate::menu::Screen;
 const GLASS: Color = Color::srgba(0.08, 0.1, 0.12, 0.55);
 const CLEAR_GLASS: Color = Color::srgba(1.0, 1.0, 1.0, 0.04);
 const COLUMNS: u32 = 16;
-const BURNT: u32 = 6;
-const ROTOR_HEIGHT: f32 = 1.5;
-const TRAFFIC_BACK: f32 = 1.5;
-const TRAFFIC_AHEAD: f32 = 3.0;
-const WHEEL_SINK: f32 = 0.875;
-const CARRY_ON: f32 = 64.0;
 
 #[derive(Resource)]
 pub struct VehicleTypes(pub Vec<VehicleType>);
@@ -149,7 +143,7 @@ fn rotation(q: Quat) -> Quat {
 }
 
 fn paint_of(health: i32, color: u32) -> Paint {
-    Paint(if health <= 0 { BURNT } else if color < COLUMNS { color } else { 0 })
+    Paint(if health <= 0 { 6 } else if color < COLUMNS { color } else { 0 })
 }
 
 fn spawn_vehicle(commands: &mut Commands, assets: &AssetServer, types: &VehicleTypes, kind: VehicleKind, root: impl Bundle) {
@@ -167,7 +161,7 @@ fn spawn_vehicle(commands: &mut Commands, assets: &AssetServer, types: &VehicleT
 
     if kind == VehicleKind::Helicopter {
         for half in [0.0, PI] {
-            commands.spawn((Rotor(half), scene(assets, "models/vehicles/rotor.glb".into()), Transform::from_xyz(0.0, ROTOR_HEIGHT, 0.0), ChildOf(vehicle)));
+            commands.spawn((Rotor(half), scene(assets, "models/vehicles/rotor.glb".into()), Transform::from_xyz(0.0, 1.5, 0.0), ChildOf(vehicle)));
         }
     }
 }
@@ -246,16 +240,16 @@ fn turn_wheels(
 
 fn place_traffic(map: &Map, ty: Option<&VehicleType>, pos: Vec3, yaw: f32) -> Transform {
     let ground = |from: Vec3, down: f32| line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, from, from - Vec3::Y * down).map(|h| h.hit.pos.y);
-    let lift = ty.and_then(|t| t.wheels.first()).map_or(0.0, |w| WHEEL_SINK * w.radius - w.mount.y);
+    let lift = ty.and_then(|t| t.wheels.first()).map_or(0.0, |w| 0.875 * w.radius - w.mount.y);
 
     let at = Vec3::new(pos.x, ground(pos + Vec3::Y * 2.0, 10.0).map_or(pos.y, |y| y + lift), pos.z);
     let mut rotation = Quat::from_rotation_y(-(FRAC_PI_2 + yaw));
 
-    if let Some(ahead) = ground(at - rotation * Vec3::Z * TRAFFIC_AHEAD, 32.0) {
-        rotation = Quat::from_axis_angle(rotation * Vec3::X, (ahead + lift - at.y).atan2(TRAFFIC_AHEAD)) * rotation;
+    if let Some(ahead) = ground(at - rotation * Vec3::Z * 3.0, 32.0) {
+        rotation = Quat::from_axis_angle(rotation * Vec3::X, (ahead + lift - at.y).atan2(3.0)) * rotation;
     }
 
-    Transform::from_translation(at - rotation * Vec3::Z * TRAFFIC_BACK).with_rotation(rotation)
+    Transform::from_translation(at - rotation * Vec3::Z * 1.5).with_rotation(rotation)
 }
 
 fn carried_on(track: &Track, now: i32) -> Vec3 {
@@ -263,7 +257,7 @@ fn carried_on(track: &Track, now: i32) -> Vec3 {
     let moved = track.pos - track.prev_pos;
     let per_tick = if gap > 0 { moved / gap as f32 } else { moved };
 
-    track.pos + per_tick * ((now - track.tick).max(0) as f32).min(CARRY_ON)
+    track.pos + per_tick * ((now - track.tick).max(0) as f32).min(64.0)
 }
 
 fn sync_traffic(

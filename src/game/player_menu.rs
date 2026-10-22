@@ -6,7 +6,7 @@ use ferrosa_protocol::{
 
 use super::{
     GAME_SCREEN, Level,
-    escape_menu::{GameMenu, PLAYER_MENU_LAYER},
+    escape_menu::GameMenu,
     items::ItemTypes,
     netgame::NetGame,
     vehicles::VehicleTypes,
@@ -16,19 +16,12 @@ use crate::{
 };
 
 const TAB: i32 = 0x1000000;
-const DISABLED: i32 = 0x100;
 const TAB_BUTTON: Vec2 = Vec2::new(160.0, 24.0);
 const BUTTON: Vec2 = Vec2::new(252.0, 40.0);
 const SMALL_BUTTON: Vec2 = Vec2::new(252.0, 22.0);
 const SPAWN_BUTTON: Vec2 = Vec2::new(240.0, 32.0);
 const PRICE: Color = Color::srgb(0.6, 0.85, 0.6);
 
-const WEAPONS_TAB: i32 = 0x80;
-const AMMO_TAB: i32 = 0x81;
-const EQUIPMENT_TAB: i32 = 0x82;
-const VEHICLES_TAB: i32 = 0x83;
-const STOCKS_TAB: i32 = 0x84;
-const MANAGER_TAB: i32 = 0x85;
 const WEAPONS: [(&str, ItemKind, i32); 5] =
     [("9mm", ItemKind::Pistol, 0), ("MP5", ItemKind::Mp5, 1), ("AK-47", ItemKind::Ak47, 2), ("M-16", ItemKind::M16, 3), ("Uzi", ItemKind::Uzi, 4)];
 const AMMO: [(&str, ItemKind, i32); 5] = [
@@ -40,21 +33,9 @@ const AMMO: [(&str, ItemKind, i32); 5] = [
 ];
 const EQUIPMENT: [(&str, ItemKind, i32); 3] = [("Bandage", ItemKind::Bandage, 0), ("Briefcase", ItemKind::Briefcase, 7), ("Grenade", ItemKind::Grenade, 6)];
 const SHARES: [i32; 4] = [1, 10, 100, 1000];
-const ENTER_CITY: i32 = 1;
-const RESPAWN_AT_BASE: i32 = 2;
-const READY: i32 = 5;
 const SHOP_BUTTON: Vec2 = Vec2::new(252.0, 28.0);
 const DESK_BUTTON: Vec2 = Vec2::new(252.0, 32.0);
-const BACK: i32 = 0x10;
-const BUY: i32 = 1;
-const SELL: i32 = 2;
-const SELL_CAR: i32 = 1;
-const DEPOSIT: i32 = 7;
 const WITHDRAWALS: [i32; 6] = [5, 10, 20, 50, 100, 1000];
-const DEALERSHIP: i32 = 3;
-const CLOTHING: i32 = 5;
-const GUN_STORE: i32 = 8;
-const BURGERS: i32 = 9;
 const COLOUR_NAMES: [&str; 6] = ["Black", "Red", "Blue", "Silver", "White", "Gold"];
 const CLOTHES: [&str; 5] = ["Blue Suit", "Red Suit", "White Suit", "Necklace", "Cash Necklace"];
 const WORN: [(Option<SuitColor>, u8); 5] = [(Some(SuitColor::Navy), 0), (Some(SuitColor::Red), 0), (Some(SuitColor::White), 0), (None, 1), (None, 2)];
@@ -144,7 +125,7 @@ fn build_player_menu(
     panels.iter().for_each(|e| commands.entity(e).despawn());
 
     let panel = commands
-        .spawn((Node { width: percent(100), height: percent(100), ..default() }, GlobalZIndex(PLAYER_MENU_LAYER), PlayerMenuPanel, DespawnOnExit(GameMenu::PlayerMenu)))
+        .spawn((Node { width: percent(100), height: percent(100), ..default() }, GlobalZIndex(3), PlayerMenuPanel, DespawnOnExit(GameMenu::PlayerMenu)))
         .id();
     let price = |kind: ItemKind| items.as_ref().and_then(|t| t.0.get(kind as usize)).map_or(0, |t| t.price);
 
@@ -207,31 +188,31 @@ fn respawn_menu(commands: &mut Commands, panel: Entity, view: &MenuView) {
     let column = group(commands, panel, 392.0, 304.0, FlexDirection::Column);
 
     if Team::CORPORATIONS.contains(&view.team) {
-        let base = choice(commands, column, "Respawn at Base", RESPAWN_AT_BASE, SPAWN_BUTTON);
+        let base = choice(commands, column, "Respawn at Base", 2, SPAWN_BUTTON);
         disabled_if(commands, base, !view.can_spawn);
     }
 
-    let city = choice(commands, column, "Enter City", ENTER_CITY, SPAWN_BUTTON);
+    let city = choice(commands, column, "Enter City", 1, SPAWN_BUTTON);
     commands.entity(city).insert(Shortcut(KeyCode::Digit1));
     disabled_if(commands, city, !view.can_spawn);
 }
 
 fn lobby(commands: &mut Commands, panel: Entity) {
     let corner = group(commands, panel, 828.0, 32.0, FlexDirection::Column);
-    let ready = choice(commands, corner, "Ready", READY, Vec2::new(192.0, 32.0));
+    let ready = choice(commands, corner, "Ready", 5, Vec2::new(192.0, 32.0));
     commands.entity(ready).insert(Shortcut(KeyCode::KeyR));
 }
 
 fn requisition(commands: &mut Commands, panel: Entity, view: &MenuView, price: &dyn Fn(ItemKind) -> i32) {
     let tabs = group(commands, panel, 4.0, 64.0, FlexDirection::Row);
-    let mut tab_list = vec![("Weapons", WEAPONS_TAB), ("Ammo", AMMO_TAB), ("Equipment", EQUIPMENT_TAB)];
+    let mut tab_list = vec![("Weapons", 128), ("Ammo", 129), ("Equipment", 130)];
 
     if view.mode != GameMode::Versus {
-        tab_list.extend([("Vehicles", VEHICLES_TAB), ("Stocks", STOCKS_TAB)]);
+        tab_list.extend([("Vehicles", 131), ("Stocks", 132)]);
     }
 
     if view.manager_tab {
-        tab_list.push(("Manager", MANAGER_TAB));
+        tab_list.push(("Manager", 133));
     }
 
     for (label, value) in tab_list {
@@ -282,7 +263,7 @@ fn back_or_done(commands: &mut Commands, column: Entity, back: bool, size: Vec2)
     commands.spawn((Node { height: px(size.y - 4.0), ..default() }, ChildOf(column)));
 
     if back {
-        choice(commands, column, "Back", BACK, size);
+        choice(commands, column, "Back", 16, size);
     } else {
         let b = ui::button(commands, column, "Done", size);
         commands.entity(b).insert(Done);
@@ -292,8 +273,8 @@ fn back_or_done(commands: &mut Commands, column: Entity, back: bool, size: Vec2)
 fn car_shop(commands: &mut Commands, panel: Entity) {
     let column = group(commands, panel, 4.0, 128.0, FlexDirection::Column);
 
-    choice(commands, column, "Buy", BUY, DESK_BUTTON);
-    choice(commands, column, "Sell", SELL, DESK_BUTTON);
+    choice(commands, column, "Buy", 1, DESK_BUTTON);
+    choice(commands, column, "Sell", 2, DESK_BUTTON);
     back_or_done(commands, column, false, DESK_BUTTON);
 }
 
@@ -302,28 +283,28 @@ fn store(commands: &mut Commands, panel: Entity, view: &MenuView, item_name: &dy
 
     for (i, &(what, cost, extra)) in view.stock.iter().enumerate() {
         let label = match view.building {
-            DEALERSHIP => format!("{} {}", usize::try_from(extra).ok().and_then(|c| COLOUR_NAMES.get(c)).copied().unwrap_or(""), vehicle_name(what)),
-            CLOTHING => CLOTHES.get(i).copied().unwrap_or("").to_string(),
-            GUN_STORE => item_name(what),
-            BURGERS => "Burger".to_string(),
+            3 => format!("{} {}", usize::try_from(extra).ok().and_then(|c| COLOUR_NAMES.get(c)).copied().unwrap_or(""), vehicle_name(what)),
+            5 => CLOTHES.get(i).copied().unwrap_or("").to_string(),
+            8 => item_name(what),
+            9 => "Burger".to_string(),
             _ => continue,
         };
-        let worn = view.building == CLOTHING && WORN.get(i).is_some_and(|&(suit, necklace)| suit == Some(view.suit) || (necklace != 0 && view.necklace == necklace));
+        let worn = view.building == 5 && WORN.get(i).is_some_and(|&(suit, necklace)| suit == Some(view.suit) || (necklace != 0 && view.necklace == necklace));
         let b = choice(commands, column, &label, i as i32 + 1, SHOP_BUTTON);
 
         with_price(commands, b, cost);
         disabled_if(commands, b, view.money < cost || worn);
     }
 
-    back_or_done(commands, column, view.building == DEALERSHIP, SHOP_BUTTON);
+    back_or_done(commands, column, view.building == 3, SHOP_BUTTON);
 }
 
 fn sell_desk(commands: &mut Commands, panel: Entity, view: &MenuView) {
     let column = group(commands, panel, 4.0, 128.0, FlexDirection::Column);
-    let dealership = view.building == DEALERSHIP;
+    let dealership = view.building == 3;
 
     if dealership {
-        choice(commands, column, "Sell Car", SELL_CAR, DESK_BUTTON);
+        choice(commands, column, "Sell Car", 1, DESK_BUTTON);
     }
 
     back_or_done(commands, column, dealership, DESK_BUTTON);
@@ -332,7 +313,7 @@ fn sell_desk(commands: &mut Commands, panel: Entity, view: &MenuView) {
 fn bank(commands: &mut Commands, panel: Entity, view: &MenuView) {
     let column = group(commands, panel, 4.0, 128.0, FlexDirection::Column);
 
-    choice(commands, column, "Deposit", DEPOSIT, DESK_BUTTON);
+    choice(commands, column, "Deposit", 7, DESK_BUTTON);
 
     for (k, amount) in WITHDRAWALS.into_iter().enumerate() {
         choice(commands, column, &format!("Withdrawl ${amount}"), k as i32 + 1, DESK_BUTTON);
@@ -356,7 +337,7 @@ fn server_buttons(commands: &mut Commands, panel: Entity, view: &MenuView) {
         }
 
         let b = choice(commands, column, &button.text, button.id, Vec2::new(252.0, 36.0));
-        disabled_if(commands, b, button.id & DISABLED != 0);
+        disabled_if(commands, b, button.id & 256 != 0);
     }
 
     done_button(commands, panel, 16.0, 480.0);

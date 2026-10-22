@@ -7,7 +7,7 @@ use bevy::{
 };
 use crate::{
     audio::AudioDevices,
-    config::{Config, SENSITIVITY, VOICE_BOOST, config_path},
+    config::{Config, config_path},
     keys::{key_name, mouse_button_bit, scancode},
     menu::{Screen, back_button, text},
     ui::{self, Shortcut},
@@ -142,7 +142,7 @@ pub fn spawn_options(commands: &mut Commands, config: &Config, devices: &AudioDe
     flag(&mut commands, left, "Rosa-like Colours", config, |c| &mut c.rosa_colours);
 
     heading(&mut commands, left, "Controls");
-    let sensitivity = ui::slider::slider_int(&mut commands, left, "Mouse Sensitivity", config.mouse_sensitivity.clamp(SENSITIVITY.0, SENSITIVITY.1), SENSITIVITY, ITEM.x);
+    let sensitivity = ui::slider::slider_int(&mut commands, left, "Mouse Sensitivity", config.mouse_sensitivity.clamp(10, 400), (10, 400), ITEM.x);
     commands.entity(sensitivity).observe(|v: On<ValueChange<f32>>, mut config: ResMut<Config>| {
         let sensitivity = v.value.round() as i32;
         if config.mouse_sensitivity != sensitivity {
@@ -173,7 +173,7 @@ pub fn spawn_options(commands: &mut Commands, config: &Config, devices: &AudioDe
     commands.entity(input).observe(|v: On<ValueChange<usize>>, mut devices: ResMut<AudioDevices>| devices.chosen_input = v.value);
 
     heading(&mut commands, right, "Voice");
-    let boost = ui::slider::slider_int(&mut commands, right, "Voice Volume", config.voice_boost.clamp(VOICE_BOOST.0, VOICE_BOOST.1), VOICE_BOOST, ITEM.x);
+    let boost = ui::slider::slider_int(&mut commands, right, "Voice Volume", config.voice_boost.clamp(13, 400), (13, 400), ITEM.x);
     commands.entity(boost).observe(|v: On<ValueChange<f32>>, mut config: ResMut<Config>| {
         let boost = v.value.round() as i32;
         if config.voice_boost != boost {

@@ -6,11 +6,6 @@ use crate::{fonts::GameFonts, game::netgame::NetGame};
 
 const PHONE_LINES: [&str; 3] = ["1111 - Goldmen", "2222 - Monsota", "3333 - OXS"];
 const WORLD_PHONE_LINES: [&str; 3] = ["4444 - Nexaco", "5555 - Pentacom", "6666 - Prodocon"];
-const READY: i32 = 0;
-pub const DIALLING: i32 = 1;
-const RINGING: i32 = 2;
-const IN_USE: i32 = 3;
-const BUSY: i32 = 4;
 
 #[derive(Component)]
 pub(super) struct PhoneHelp;
@@ -26,18 +21,18 @@ fn phone_help(net: &NetGame, item: usize) -> Vec<(String, f32, Color)> {
     let line = |s: &str| (s.to_string(), 16.0, white);
 
     let mut lines = match status {
-        READY => vec![line("Left-click to dial")],
-        DIALLING => {
+        0 => vec![line("Left-click to dial")],
+        1 => {
             let world = if net.sync.game_type == GameMode::World { &WORLD_PHONE_LINES[..] } else { &[] };
             [&["Use Numpad or number keys"][..], &PHONE_LINES, world].concat().into_iter().map(line).collect()
         }
-        BUSY => vec![line("Busy")],
-        RINGING => vec![line(if number > 0 { "Left-click to answer" } else { "Left-click to hang up" })],
-        IN_USE => vec![("In Use".to_string(), 24.0, colour([0.0, 1.0, 0.0, 1.0]))],
+        4 => vec![line("Busy")],
+        2 => vec![line(if number > 0 { "Left-click to answer" } else { "Left-click to hang up" })],
+        3 => vec![("In Use".to_string(), 24.0, colour([0.0, 1.0, 0.0, 1.0]))],
         _ => vec![],
     };
 
-    if matches!(status, DIALLING | RINGING) && number > 0 {
+    if matches!(status, 1 | 2) && number > 0 {
         lines.push((format!("Number: {number}"), 24.0, white));
     }
 

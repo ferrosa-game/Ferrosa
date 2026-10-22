@@ -6,7 +6,7 @@ use ferrosa_protocol::{
 
 use super::{
     computer::AtComputer,
-    escape_menu::{GameMenu, ROSTER_LAYER},
+    escape_menu::GameMenu,
     mute::{Voice, VoiceIcons, voice_icon},
     netgame::{NetGame, entities::Player},
     player_menu::Choice,
@@ -24,11 +24,7 @@ const COLUMNS_AT: Vec2 = Vec2::new(8.0, 80.0);
 const KEY: KeyCode = KeyCode::KeyH;
 const WATCHING: [f32; 3] = [1.0; 3];
 const DAYS: [&str; 7] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const LAST_DAY: u32 = 5;
-const OBSERVER: i32 = 4;
 const JOIN_KEYS: [KeyCode; 3] = [KeyCode::Digit1, KeyCode::Digit2, KeyCode::Digit3];
-const BUTTON_HEIGHT: f32 = 28.0;
-const ICON: f32 = 24.0;
 
 #[derive(Clone, PartialEq)]
 enum Item {
@@ -90,7 +86,7 @@ fn roster(net: &NetGame) -> View {
     let watching = me.is_some_and(|p| p.team == Team::Spectator);
 
     let day = net.sync.weekly.then(|| DAYS.get(net.sync.weekday as usize).map(|d| d.to_string())).flatten();
-    let winner = (net.sync.weekly && state == GameState::Restarting && net.sync.weekday == LAST_DAY).then(|| {
+    let winner = (net.sync.weekly && state == GameState::Restarting && net.sync.weekday == 5).then(|| {
         let best = (0..3).fold(0, |best, t| if prices[t] > prices[best] { t } else { best });
         (format!("{} Wins!", SHORT_NAMES[best]), TEAM_COLOURS[best])
     });
@@ -120,7 +116,7 @@ fn roster(net: &NetGame) -> View {
                 Some(_) if joining && watching => {
                     items.push(Item::Button { label: format!("Join {}", SHORT_NAMES[column]), choice: column as i32 + 1, key: JOIN_KEYS[column] });
                 }
-                None if joining && !watching => items.push(Item::Button { label: "Observer".to_string(), choice: OBSERVER, key: KeyCode::Digit4 }),
+                None if joining && !watching => items.push(Item::Button { label: "Observer".to_string(), choice: 4, key: KeyCode::Digit4 }),
                 _ => {}
             }
 
@@ -175,7 +171,7 @@ fn spawn_text(commands: &mut Commands, parent: Entity, s: &str, font: &Handle<Fo
 
 fn spawn_roster(commands: &mut Commands, view: &View, font: &Handle<Font>, icons: &VoiceIcons) {
     let full = Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), ..default() };
-    let panel = commands.spawn((full, Pickable::IGNORE, GlobalZIndex(ROSTER_LAYER), RosterPanel, DespawnOnExit(Screen::InGame))).id();
+    let panel = commands.spawn((full, Pickable::IGNORE, GlobalZIndex(4), RosterPanel, DespawnOnExit(Screen::InGame))).id();
 
     if let Some(day) = &view.day {
         spawn_text(commands, panel, day, font, 20.0, WATCHING, Node { position_type: PositionType::Absolute, left: px(8), top: px(16), ..default() });
@@ -222,14 +218,14 @@ fn spawn_items(commands: &mut Commands, column: Entity, items: &[Item], width: f
             Item::Text { text, size, colour } => spawn_text(commands, column, text, font, *size, *colour, Node::default()),
             Item::Button { label, choice, key } => {
                 let spacer = commands.spawn((Node { margin: UiRect::vertical(px(6)), ..default() }, ChildOf(column))).id();
-                let b = ui::button(commands, spacer, label, Vec2::new(width - 16.0, BUTTON_HEIGHT));
+                let b = ui::button(commands, spacer, label, Vec2::new(width - 16.0, 28.0));
                 commands.entity(b).insert((Choice(*choice), Shortcut(*key)));
             }
             Item::Player { name, line, colour, voice } => {
                 let row = commands.spawn((Node { column_gap: px(4), align_items: AlignItems::Center, ..default() }, Pickable::IGNORE, ChildOf(column))).id();
 
                 if let Some((voice, toggle)) = voice {
-                    voice_icon(commands, row, icons, *voice, ICON, *toggle);
+                    voice_icon(commands, row, icons, *voice, 24.0, *toggle);
                 }
 
                 let lines = commands.spawn((Node { flex_direction: FlexDirection::Column, ..default() }, Pickable::IGNORE, ChildOf(row))).id();

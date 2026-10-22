@@ -3,7 +3,7 @@ use ferrosa_protocol::clientbound::game::ItemKind;
 
 use super::{
     controls::{Control, InputState},
-    hud::{self, Stick, DIALLING, HudScreen, align, anchored, in_hand, is_phone, own, rect, spawn_screen, text},
+    hud::{self, Stick, HudScreen, align, anchored, in_hand, is_phone, own, rect, spawn_screen, text},
     items::ItemTypes,
     netgame::{INVENTORY_SLOTS, NetGame},
 };
@@ -117,7 +117,7 @@ fn show_inventory(
     mut last: Local<Option<View>>,
 ) {
     let view = own(&net).map(|(p, h, _)| {
-        let dialling = in_hand(&net, h, 0).is_some_and(|(item, kind)| is_phone(kind) && net.items[item].phone.0 == DIALLING);
+        let dialling = in_hand(&net, h, 0).is_some_and(|(item, kind)| is_phone(kind) && net.items[item].phone.0 == 1);
         let selected = (2..INVENTORY_SLOTS).find(|&slot| !dialling && input.holding(Control::Row((slot - 1) as u8)));
 
         View { slots: p.display_inventory.iter().map(|s| s.iter().map(|&c| entry(c)).collect()).collect(), selected }

@@ -26,32 +26,14 @@ use super::{
 use crate::{fonts::GameFonts, character_model::HumanPose, menu::Screen};
 
 const LOG_AT: Vec2 = Vec2::new(4.0, 400.0);
-const LOG_SIZE: f32 = 20.0;
 const BACKING: Color = Color::srgba(0.15, 0.15, 0.15, 0.6);
 const ANNOUNCE_AT: Vec2 = Vec2::new(512.0, 80.0);
-const ANNOUNCE_SIZE: f32 = 24.0;
 const ANNOUNCE_COLOUR: [f32; 3] = [0.75, 0.75, 1.0];
 const LABEL_AT: Vec2 = Vec2::new(4.0, 320.0);
 const ENTRY_AT: Vec2 = Vec2::new(60.0, 320.0);
-const ENTRY_SIZE: f32 = 16.0;
-const ENTRY_WIDTH: f32 = 600.0;
 const ENTRY_SHADE: Color = Color::srgba(0.0, 0.0, 0.0, 0.5);
 const LEVEL_AT: Vec2 = Vec2::new(4.0, 524.0);
-const LEVEL_SIZE: f32 = 18.0;
-const MAX_TYPED: usize = 0x3f;
-const FADE_FRAMES: f32 = 200.0;
 const LEVELS: [&str; 3] = ["Whisper", "Say", "Yell"];
-const WHISPER: i32 = 0;
-const SAY: i32 = 1;
-const YELL: i32 = 2;
-const BUBBLE_SIZE: f32 = 32.0;
-const BUBBLE_FALLOFF: f32 = 0.125;
-const ITEM_BUBBLE: f32 = 0.125;
-const SMALLEST: f32 = 4.0;
-const FADING: f32 = 8.0;
-const ABOVE_HEAD: f32 = 0.5;
-const ITEM_SHADE: f32 = 0.5;
-const PHONE: &str = "Phone";
 
 #[derive(Resource)]
 pub struct ChatState {
@@ -60,7 +42,7 @@ pub struct ChatState {
 
 impl Default for ChatState {
     fn default() -> Self {
-        Self { level: SAY }
+        Self { level: 1 }
     }
 }
 
@@ -121,7 +103,7 @@ fn spawn_chat(mut commands: Commands, fonts: Res<GameFonts>) {
 
     let hud = spawn_screen(&mut commands, HudScreen, Stick::BottomLeft);
     let (node, shift) = anchored(align::BOTTOM, LEVEL_AT);
-    commands.spawn((node, shift, LevelText, text("", &fonts.rockwell, LEVEL_SIZE, Color::WHITE), ChildOf(hud)));
+    commands.spawn((node, shift, LevelText, text("", &fonts.rockwell, 18.0, Color::WHITE), ChildOf(hud)));
 
     let full = Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), ..default() };
     commands.spawn((full, Bubbles, Pickable::IGNORE, DespawnOnExit(Screen::InGame)));
@@ -136,7 +118,7 @@ fn age_chat(time: Res<Time>, mut net: ResMut<NetGame>) {
 }
 
 fn alpha(life: f32) -> f32 {
-    (life * GAME_FPS / FADE_FRAMES).clamp(0.0, 1.0)
+    (life * GAME_FPS / 200.0).clamp(0.0, 1.0)
 }
 
 fn rebuild(commands: &mut Commands, panel: Entity, children: Option<&Children>, shown: &[(Shown, f32)], font: &Handle<Font>, size: f32) {
@@ -167,13 +149,13 @@ fn log_lines(net: &NetGame) -> Vec<(Shown, f32)> {
                 _ => None,
             };
             let name = player.and_then(|p| usize::try_from(p).ok()).and_then(|p| net.players.get(p)).filter(|p| p.active).map(|p| p.name.as_str());
-            let name = if l.kind == ChatType::ItemSpeak { Some(PHONE) } else { name };
+            let name = if l.kind == ChatType::ItemSpeak { Some("Phone") } else { name };
             let text = name.map_or_else(|| l.text.clone(), |n| format!("{n}: {}", l.text));
             let colour = match (l.kind, l.volume) {
                 (ChatType::PrivateMessage, _) => [1.0, 0.0, 0.0],
                 (ChatType::ItemSpeak, _) => [0.75; 3],
-                (ChatType::Chat, WHISPER) => [0.6, 0.6, 1.0],
-                (ChatType::Chat, YELL) => [1.0, 0.6, 0.6],
+                (ChatType::Chat, 0) => [0.6, 0.6, 1.0],
+                (ChatType::Chat, 2) => [1.0, 0.6, 0.6],
                 _ => [1.0; 3],
             };
 
@@ -206,7 +188,7 @@ fn show_log(
         return;
     }
 
-    rebuild(&mut commands, panel, children, &shown, &fonts.rockwell, LOG_SIZE);
+    rebuild(&mut commands, panel, children, &shown, &fonts.rockwell, 20.0);
     *last = shown.into_iter().map(|(s, _)| s).collect();
 }
 
@@ -236,7 +218,7 @@ fn show_announcements(
         return;
     }
 
-    rebuild(&mut commands, panel, children, &shown, &fonts.rockwell, ANNOUNCE_SIZE);
+    rebuild(&mut commands, panel, children, &shown, &fonts.rockwell, 24.0);
     *last = shown.into_iter().map(|(s, _)| s).collect();
 }
 
@@ -249,7 +231,7 @@ fn fade(mut lines: Query<(&Faded, &mut TextColor, &mut BackgroundColor), Changed
 
 fn show_level(state: Res<ChatState>, mut level: Single<(&mut Text, &mut Visibility), With<LevelText>>) {
     let (text, visibility) = &mut *level;
-    let word = (state.level != SAY).then(|| LEVELS[state.level as usize]);
+    let word = (state.level != 1).then(|| LEVELS[state.level as usize]);
 
     visibility.set_if_neq(if word.is_some() { Visibility::Inherited } else { Visibility::Hidden });
 
@@ -281,14 +263,14 @@ fn open_entry(mut commands: Commands, net: Option<Res<NetGame>>, state: Res<Chat
     let playing = net.is_some_and(|n| n.me().is_some_and(|p| p.human >= 0));
     let label = if playing { format!("{}:", LEVELS[state.level as usize]) } else { "Chat:".to_string() };
     let (node, shift) = anchored(align::TOP_LEFT, LABEL_AT);
-    commands.spawn((node, shift, Text::new(label), TextFont::from_font_size(ENTRY_SIZE), TextColor(Color::WHITE), ChildOf(screen)));
+    commands.spawn((node, shift, Text::new(label), TextFont::from_font_size(16.0), TextColor(Color::WHITE), ChildOf(screen)));
 
     let mut editable = EditableText::new("");
-    editable.max_characters = Some(MAX_TYPED);
+    editable.max_characters = Some(63);
 
     let (node, _) = anchored(align::TOP_LEFT, ENTRY_AT);
     let entry = commands
-        .spawn((Node { width: px(ENTRY_WIDTH), ..node }, Entry, TextInput, editable, TextFont::from_font_size(ENTRY_SIZE), BackgroundColor(ENTRY_SHADE), ChildOf(screen)))
+        .spawn((Node { width: px(600.0), ..node }, Entry, TextInput, editable, TextFont::from_font_size(16.0), BackgroundColor(ENTRY_SHADE), ChildOf(screen)))
         .observe(finish_entry)
         .id();
 
@@ -332,24 +314,24 @@ fn finish_entry(
 }
 
 fn bubble_colour(line: &ChatLine) -> [f32; 3] {
-    let shade = if line.kind == ChatType::ItemSpeak { ITEM_SHADE } else { 0.0 };
+    let shade = if line.kind == ChatType::ItemSpeak { 0.5 } else { 0.0 };
 
     match line.volume {
-        WHISPER => [shade, shade, shade + 0.5],
-        YELL => [shade + 0.5, shade, shade],
+        0 => [shade, shade, shade + 0.5],
+        2 => [shade + 0.5, shade, shade],
         _ => [shade; 3],
     }
 }
 
 fn bubble_size(line: &ChatLine, distance: f32) -> f32 {
-    let size = BUBBLE_SIZE / (distance * BUBBLE_FALLOFF);
+    let size = 32.0 / (distance * 0.125);
     let loud = match line.volume {
-        WHISPER => size * 0.25,
-        YELL => size * 2.0,
+        0 => size * 0.25,
+        2 => size * 2.0,
         _ => size,
     };
 
-    if line.kind == ChatType::ItemSpeak { loud * ITEM_BUBBLE } else { loud }
+    if line.kind == ChatType::ItemSpeak { loud * 0.125 } else { loud }
 }
 
 fn show_bubbles(
@@ -383,16 +365,16 @@ fn show_bubbles(
         };
         let Some(from) = from else { continue };
 
-        let at = from + up * ABOVE_HEAD;
-        let size = bubble_size(line, at.distance(view.translation())).min(BUBBLE_SIZE);
+        let at = from + up * 0.5;
+        let size = bubble_size(line, at.distance(view.translation())).min(32.0);
 
-        if size <= SMALLEST {
+        if size <= 4.0 {
             continue;
         }
 
         let Ok(on_screen) = camera.world_to_viewport(view, at) else { continue };
         let stack = stacks.entry((line.kind == ChatType::ItemSpeak, line.speaker)).or_default();
-        let fading = if size < FADING { (size - SMALLEST) / (FADING - SMALLEST) } else { 1.0 };
+        let fading = if size < 8.0 { (size - 4.0) / (8.0 - 4.0) } else { 1.0 };
         let a = alpha(line.life) * fading;
         let [r, g, b] = bubble_colour(line);
         let place = on_screen / scale.0 - Vec2::Y * *stack;

@@ -2,17 +2,11 @@ use std::collections::VecDeque;
 
 use bevy::{ecs::component::Mutable, prelude::*};
 
-use super::{netgame::NetGame, network::TICK_SECONDS};
+use super::netgame::NetGame;
 use crate::{
     character_model::{BONES, HumanPose},
     menu::Screen,
 };
-
-const DELAY: f64 = 2.0;
-const DRIFT: f64 = 16.0;
-const CATCH_UP: f64 = 2.0;
-const KEPT: usize = 8;
-const FURTHEST: f32 = 32.0;
 
 #[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Smoothing {
@@ -39,7 +33,7 @@ impl Blend for Transform {
     }
 
     fn far(&self, to: &Self) -> bool {
-        self.translation.distance(to.translation) > FURTHEST
+        self.translation.distance(to.translation) > 32.0
     }
 }
 
@@ -72,7 +66,7 @@ impl<T: Blend> Snapshots<T> {
 
         self.0.push_back((tick, value));
 
-        if self.0.len() > KEPT {
+        if self.0.len() > 8 {
             self.0.pop_front();
         }
     }
@@ -103,11 +97,11 @@ impl Plugin for SmoothingPlugin {
 
 fn move_clock(time: Res<Time>, net: Option<Res<NetGame>>, mut clock: ResMut<RenderTick>) {
     let Some(net) = net else { return };
-    let target = net.tick as f64 - DELAY;
-    let moved = clock.0.map(|tick| tick + time.delta_secs_f64() / TICK_SECONDS);
+    let target = net.tick as f64 - 2.0;
+    let moved = clock.0.map(|tick| tick + time.delta_secs_f64() / (1.0 / 60.0));
 
     clock.0 = Some(match moved {
-        Some(tick) if (target - tick).abs() < DRIFT => tick + (target - tick) * (CATCH_UP * time.delta_secs_f64()).min(1.0),
+        Some(tick) if (target - tick).abs() < 16.0 => tick + (target - tick) * (2.0 * time.delta_secs_f64()).min(1.0),
         _ => target,
     });
 }

@@ -1,10 +1,5 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 
-const FRAGMENT_OVER: usize = 0x4b0;
-const FRAGMENT: usize = 0x400;
-const FRAGMENT_SLOTS: usize = 64;
-const MAX_FRAGMENTS: usize = 16;
-
 #[derive(Clone, Debug)]
 pub struct Packet {
     pub data: Vec<u8>,
@@ -36,13 +31,13 @@ impl ClientSocket {
             let _ = s.set_broadcast(true);
         }
 
-        Self { socket, fragment_id: 0, slots: vec![Reassembly::default(); FRAGMENT_SLOTS], first: 0, next: 0 }
+        Self { socket, fragment_id: 0, slots: vec![Reassembly::default(); 64], first: 0, next: 0 }
     }
 
     pub fn send(&mut self, data: &[u8], to: SocketAddrV4) {
         let Some(socket) = &self.socket else { return };
 
-        if data.len() <= FRAGMENT_OVER {
+        if data.len() <= 1200 {
             let _ = socket.send_to(data, to);
             return;
         }
@@ -50,7 +45,7 @@ impl ClientSocket {
         let count = (data.len() >> 10) + 1;
 
         for i in 0..count {
-            let chunk = &data[(i * FRAGMENT).min(data.len())..((i + 1) * FRAGMENT).min(data.len())];
+            let chunk = &data[(i * 1024).min(data.len())..((i + 1) * 1024).min(data.len())];
             let mut f = b"7DFF".to_vec();
 
             f.extend_from_slice(&self.fragment_id.to_le_bytes());
@@ -94,7 +89,7 @@ impl ClientSocket {
         let id = u16::from_le_bytes([f[0], f[1]]);
         let (index, count) = (f[2] as usize, f[3] as usize);
 
-        if count > MAX_FRAGMENTS || index > MAX_FRAGMENTS - 1 {
+        if count > 16 || index > 16 - 1 {
             return None;
         }
 
@@ -103,11 +98,11 @@ impl ClientSocket {
         let slot = loop {
             if k == self.next {
                 let s = self.next;
-                self.slots[s] = Reassembly { id, received: 0, len: 0, data: vec![0; MAX_FRAGMENTS * FRAGMENT] };
-                self.next = (s + 1) % FRAGMENT_SLOTS;
+                self.slots[s] = Reassembly { id, received: 0, len: 0, data: vec![0; 16 * 1024] };
+                self.next = (s + 1) % 64;
 
                 if self.next == self.first {
-                    self.first = (self.first + 1) % FRAGMENT_SLOTS;
+                    self.first = (self.first + 1) % 64;
                 }
 
                 break s;
@@ -117,12 +112,12 @@ impl ClientSocket {
                 break k;
             }
 
-            k = (k + 1) % FRAGMENT_SLOTS;
+            k = (k + 1) % 64;
         };
 
         let s = &mut self.slots[slot];
         let body = &f[4..];
-        let at = index * FRAGMENT;
+        let at = index * 1024;
 
         s.data[at..at + body.len()].copy_from_slice(body);
         s.len = s.len.max(at + body.len());

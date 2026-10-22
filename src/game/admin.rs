@@ -18,10 +18,6 @@ const BACK: Vec2 = Vec2::new(240.0, 32.0);
 const LIST_AT: Vec2 = Vec2::new(128.0, 64.0);
 const ROW: Vec2 = Vec2::new(192.0, 28.0);
 const FIELD_WIDTH: f32 = 120.0;
-const BAN: u8 = 4;
-const SET_RATING: u8 = 5;
-const MAX_TIME: i32 = 100_000_000;
-const MAX_RATING: i32 = 10_000;
 
 #[derive(Resource, Default)]
 struct AdminPage {
@@ -96,12 +92,12 @@ fn build_page(mut commands: Commands, net: Res<NetGame>, mut page: ResMut<AdminP
         }
         Some(row) => {
             let ban = at(&mut commands, screen, Vec2::new(32.0, 128.0), FlexDirection::Row);
-            let time = ui::number_input(&mut commands, ban, "Time", page.time, (0, MAX_TIME), FIELD_WIDTH);
+            let time = ui::number_input(&mut commands, ban, "Time", page.time, (0, 100_000_000), FIELD_WIDTH);
             commands.entity(time).observe(|v: On<ValueChange<i32>>, mut page: ResMut<AdminPage>| page.time = v.value);
             admin_button(&mut commands, ban, &format!("Ban {}", row.name), ROW, AdminButton::Ban);
 
             let rate = at(&mut commands, screen, Vec2::new(32.0, 176.0), FlexDirection::Row);
-            let rating = ui::number_input(&mut commands, rate, "Rating", page.rating, (0, MAX_RATING), FIELD_WIDTH);
+            let rating = ui::number_input(&mut commands, rate, "Rating", page.rating, (0, 10_000), FIELD_WIDTH);
             commands.entity(rating).observe(|v: On<ValueChange<i32>>, mut page: ResMut<AdminPage>| page.rating = v.value);
             admin_button(&mut commands, rate, &format!("Set Rating {}", row.name), ROW, AdminButton::SetRating);
         }
@@ -125,11 +121,11 @@ fn on_button(activate: On<Activate>, buttons: Query<&AdminButton>, net: Option<R
         AdminButton::Back => menu.set(GameMenu::Open),
         AdminButton::Row(k) => page.chosen = Some(k),
         AdminButton::Ban => {
-            send(BAN, page.time);
+            send(4, page.time);
             menu.set(GameMenu::Open);
         }
         AdminButton::SetRating => {
-            send(SET_RATING, page.rating);
+            send(5, page.rating);
             menu.set(GameMenu::Open);
         }
     }

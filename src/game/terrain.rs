@@ -1,14 +1,5 @@
 use ferrosa_world::ground::Ground;
 
-const SAMPLE_OFFSET: i32 = 4096;
-const WORLD_MIN: i32 = -4096;
-const WORLD_SIZE: i32 = 16384;
-const NEAR_STEP: i32 = 2;
-const NEAR_TILE: i32 = 256;
-const NEAR_MARGIN: i32 = 512;
-const FAR_STEP: i32 = 32;
-const FAR_TILE: i32 = 2048;
-
 #[derive(Default)]
 pub struct Tile {
     pub positions: Vec<[f32; 3]>,
@@ -17,9 +8,9 @@ pub struct Tile {
 }
 
 fn height(ground: &Ground, x: i32, z: i32) -> f32 {
-    let (sx, sz) = (x + SAMPLE_OFFSET, z + SAMPLE_OFFSET);
+    let (sx, sz) = (x + 4096, z + 4096);
 
-    if !(0..WORLD_SIZE).contains(&sx) || !(0..WORLD_SIZE).contains(&sz) {
+    if !(0..16384).contains(&sx) || !(0..16384).contains(&sz) {
         return 0.0;
     }
 
@@ -58,25 +49,25 @@ fn grid(ground: &Ground, x0: i32, z0: i32, size: i32, step: i32, skip: &dyn Fn(i
 }
 
 pub fn build(ground: &Ground, near: (i32, i32, i32, i32)) -> Vec<Tile> {
-    let snap = |v: i32, up: bool| if up { (v + NEAR_TILE - 1).div_euclid(NEAR_TILE) * NEAR_TILE } else { v.div_euclid(NEAR_TILE) * NEAR_TILE };
-    let (nx0, nz0) = (snap(near.0 - NEAR_MARGIN, false), snap(near.1 - NEAR_MARGIN, false));
-    let (nx1, nz1) = (snap(near.2 + NEAR_MARGIN, true), snap(near.3 + NEAR_MARGIN, true));
+    let snap = |v: i32, up: bool| if up { (v + 256 - 1).div_euclid(256) * 256 } else { v.div_euclid(256) * 256 };
+    let (nx0, nz0) = (snap(near.0 - 512, false), snap(near.1 - 512, false));
+    let (nx1, nz1) = (snap(near.2 + 512, true), snap(near.3 + 512, true));
     let inside = |x: i32, z: i32| (nx0..nx1).contains(&x) && (nz0..nz1).contains(&z);
 
     let mut tiles = Vec::new();
-    for z0 in (nz0..nz1).step_by(NEAR_TILE as usize) {
-        for x0 in (nx0..nx1).step_by(NEAR_TILE as usize) {
-            let cleared = |x: i32, z: i32| !ground.cell_ok(x + SAMPLE_OFFSET, z + SAMPLE_OFFSET);
+    for z0 in (nz0..nz1).step_by(256_usize) {
+        for x0 in (nx0..nx1).step_by(256_usize) {
+            let cleared = |x: i32, z: i32| !ground.cell_ok(x + 4096, z + 4096);
 
-            tiles.push(grid(ground, x0, z0, NEAR_TILE, NEAR_STEP, &cleared));
+            tiles.push(grid(ground, x0, z0, 256, 2, &cleared));
         }
     }
 
-    for z0 in (WORLD_MIN..WORLD_MIN + WORLD_SIZE).step_by(FAR_TILE as usize) {
-        for x0 in (WORLD_MIN..WORLD_MIN + WORLD_SIZE).step_by(FAR_TILE as usize) {
-            let covered = |x: i32, z: i32| inside(x, z) && inside(x + FAR_STEP - 1, z + FAR_STEP - 1);
+    for z0 in (-4096..-4096 + 16384).step_by(2048_usize) {
+        for x0 in (-4096..-4096 + 16384).step_by(2048_usize) {
+            let covered = |x: i32, z: i32| inside(x, z) && inside(x + 32 - 1, z + 32 - 1);
             
-            tiles.push(grid(ground, x0, z0, FAR_TILE, FAR_STEP, &covered));
+            tiles.push(grid(ground, x0, z0, 2048, 32, &covered));
         }
     }
 

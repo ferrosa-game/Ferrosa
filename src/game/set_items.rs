@@ -8,10 +8,6 @@ use super::{
 };
 use crate::menu::Screen;
 
-const SET_MASK: u32 = 1023;
-const TURN_SHIFT: u32 = 24;
-const TURN_MASK: u32 = 3;
-
 #[derive(Component)]
 struct SetItem(IVec3);
 
@@ -33,7 +29,7 @@ fn set_cells(level: &Level) -> Vec<IVec3> {
 
     area.blocks()
         .flat_map(|(base, record)| {
-            record.item_set.iter().enumerate().filter(|&(_, &word)| word & SET_MASK != 0).map(move |(k, _)| base + IVec3::new((k & 7) as i32, (k >> 6) as i32, ((k >> 3) & 7) as i32))
+            record.item_set.iter().enumerate().filter(|&(_, &word)| word & 1023 != 0).map(move |(k, _)| base + IVec3::new((k & 7) as i32, (k >> 6) as i32, ((k >> 3) & 7) as i32))
         })
         .collect()
 }
@@ -41,8 +37,8 @@ fn set_cells(level: &Level) -> Vec<IVec3> {
 fn draw_cell(commands: &mut Commands, assets: &AssetServer, level: &Level, types: &ItemTypes, cell: IVec3) {
     let area = &level.map.level.area;
     let word = area.item_set(cell.x, cell.y, cell.z);
-    let Some(set) = area.item_sets.set(word).filter(|_| word & SET_MASK != 0) else { return };
-    let turn = (word >> TURN_SHIFT) & TURN_MASK;
+    let Some(set) = area.item_sets.set(word).filter(|_| word & 1023 != 0) else { return };
+    let turn = (word >> 24) & 3;
     let taken = area.taken(cell.x, cell.y, cell.z);
 
     for (i, entry) in set.entries.iter().enumerate() {

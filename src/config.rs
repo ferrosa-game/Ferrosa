@@ -6,9 +6,6 @@ use std::{
 use bevy::prelude::*;
 use rand::RngExt;
 
-pub const SENSITIVITY: (i32, i32) = (10, 400);
-pub const VOICE_BOOST: (i32, i32) = (13, 400);
-
 #[derive(Resource, Clone, Debug)]
 pub struct Config {
     pub fullscreen: i32,
@@ -76,11 +73,11 @@ impl Config {
     }
 
     pub fn sensitivity(&self) -> f32 {
-        self.mouse_sensitivity.clamp(SENSITIVITY.0, SENSITIVITY.1) as f32 / 100.0
+        self.mouse_sensitivity.clamp(10, 400) as f32 / 100.0
     }
 
     pub fn voice_gain(&self) -> f32 {
-        self.voice_boost.clamp(VOICE_BOOST.0, VOICE_BOOST.1) as f32 / 100.0
+        self.voice_boost.clamp(13, 400) as f32 / 100.0
     }
 
     fn visit(&mut self, v: &mut impl Visitor) {

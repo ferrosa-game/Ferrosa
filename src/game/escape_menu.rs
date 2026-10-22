@@ -10,8 +10,6 @@ use crate::{
 };
 
 const BUTTON: Vec2 = Vec2::new(240.0, 32.0);
-pub const BACKDROP_LAYER: i32 = 2;
-pub const PLAYER_MENU_LAYER: i32 = 3;
 pub const ROSTER_LAYER: i32 = 4;
 pub const OVERLAY_LAYER: i32 = 5;
 pub const MENU_LAYER: i32 = 6;

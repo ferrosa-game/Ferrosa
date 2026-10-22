@@ -11,9 +11,7 @@ use super::{
 };
 use crate::character_model::{HideHead, HumanPose};
 
-const CAMERA_TURN: f32 = 0.125;
 const MIN_TURN: f32 = 1.0 / 65536.0;
-const DEATH_VIEW: f32 = 3.0;
 
 #[derive(Resource)]
 pub struct FirstPerson {
@@ -82,7 +80,7 @@ fn follow_head(mut fp: ResMut<FirstPerson>, net: Res<NetGame>) {
     };
 
     fp.pos = fp.pos.lerp(head_pos, 0.5);
-    fp.spin = (turn_between(fp.rot, target) * CAMERA_TURN + fp.spin) * 0.5;
+    fp.spin = (turn_between(fp.rot, target) * 0.125 + fp.spin) * 0.5;
 
     if fp.spin.length() > MIN_TURN {
         fp.rot = (Quat::from_scaled_axis(fp.spin) * fp.rot).normalize();
@@ -118,7 +116,7 @@ fn choose_view(time: Res<Time>, net: Option<Res<NetGame>>, mut fp: ResMut<FirstP
 
     fp.active = match alive {
         Some(true) => {
-            fp.death_view = DEATH_VIEW;
+            fp.death_view = 3.0;
             true
         }
         Some(false) => {

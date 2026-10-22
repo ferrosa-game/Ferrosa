@@ -8,7 +8,7 @@ use crate::{
     names::corporation_index,
 };
 
-const CORPORATION_MENUS: std::ops::RangeInclusive<i32> = 0xe..=0x1a;
+const CORPORATION_MENUS: std::ops::RangeInclusive<i32> = 14..=26;
 
 #[derive(Component)]
 pub(super) struct MenuLine;

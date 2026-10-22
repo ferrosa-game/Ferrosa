@@ -11,33 +11,17 @@ use ferrosa_world::{collide::calculate_face_normal, track::Track};
 
 use super::{
     Level,
-    blocks::{self, Part},
+    blocks::Part,
     loading::LevelGeometry,
     textures::{self, Pixels},
 };
 use crate::menu::Screen;
 
-const NEAR: f32 = 192.0;
-const NEAR_FADE: f32 = 32.0;
-const WATER_LEVEL: f32 = 23.0;
-const WATER_MIN: f32 = -4096.0;
-const WATER_MAX: f32 = 2048.0;
 const WATER: Color = Color::srgba(0.1, 0.25, 0.35, 0.85);
 const GLASS: Color = Color::srgba(0.6, 0.7, 0.75, 0.25);
 const GRASS: Color = Color::srgb(0.25, 0.33, 0.15);
 const DARK: Color = Color::srgb(0.06, 0.06, 0.06);
 const MISSING: Color = Color::srgb(1.0, 0.25, 0.5);
-const DARK_MATERIAL: usize = 2;
-const SHARPEST_SEAM: u32 = 32;
-const TRACK_MAP: &str = "test2";
-const TUBE: i32 = 0;
-const RAMP: i32 = 1;
-const RAIL_PART: usize = 0;
-const WALL_PART: usize = 2;
-const RAIL_LIFT: f32 = 0.125;
-const WALL_MATERIAL: usize = 0;
-const RAMP_MATERIAL: usize = 1;
-const RAIL_MATERIAL: usize = 2;
 
 #[derive(Component)]
 pub struct BlockPanes {
@@ -109,8 +93,8 @@ fn make_materials(mut commands: Commands, level: Res<Level>, geometry: Res<Level
     let decoded: Vec<Option<Pixels>> =
         geometry.images.iter().enumerate().map(|(k, bytes)| if k == 0 { Some(textures::concrete()) } else { bytes.as_deref().and_then(Pixels::decode_png) }).collect();
 
-    let asphalt = decoded[blocks::ASPHALT].as_ref();
-    let marked = (1..=blocks::MARKINGS).map(|layer| (blocks::ASPHALT, asphalt.map(|a| textures::road_markings(a, layer))));
+    let asphalt = decoded[1].as_ref();
+    let marked = (1..=10).map(|layer| (1, asphalt.map(|a| textures::road_markings(a, layer))));
     let plain = decoded.iter().cloned().enumerate();
 
     let marked_from = decoded.len();
@@ -125,14 +109,14 @@ fn make_materials(mut commands: Commands, level: Res<Level>, geometry: Res<Level
                 if n >= marked_from
                     && let ImageSampler::Descriptor(sampler) = &mut image.sampler
                 {
-                    sampler.lod_max_clamp = (width / SHARPEST_SEAM).max(1).ilog2() as f32;
+                    sampler.lod_max_clamp = (width / 32).max(1).ilog2() as f32;
                 }
 
                 images.add(image)
             });
             let colour = match (k, &image) {
                 (_, Some(_)) => Color::WHITE,
-                (DARK_MATERIAL, _) => DARK,
+                (2, _) => DARK,
                 _ => MISSING,
             };
 
@@ -169,7 +153,7 @@ fn make_materials(mut commands: Commands, level: Res<Level>, geometry: Res<Level
         ..default()
     });
 
-    commands.insert_resource(AsphaltMaterial(blocks[blocks::ASPHALT].clone()));
+    commands.insert_resource(AsphaltMaterial(blocks[1].clone()));
     commands.insert_resource(BlockMaterials { blocks, facades, glass });
 }
 
@@ -206,13 +190,13 @@ fn track_part(track: &Track, kind: Option<i32>, part: usize, lift: f32) -> Optio
 }
 
 fn spawn_track(mut commands: Commands, level: Res<Level>, materials: Res<BlockMaterials>, mut meshes: ResMut<Assets<Mesh>>) {
-    if level.map.map_name != TRACK_MAP {
+    if level.map.map_name != "test2" {
         return;
     }
 
     let track = Track::race_track();
 
-    for (kind, part, lift, material) in [(Some(TUBE), WALL_PART, 0.0, WALL_MATERIAL), (None, RAIL_PART, RAIL_LIFT, RAIL_MATERIAL), (Some(RAMP), WALL_PART, 0.0, RAMP_MATERIAL)] {
+    for (kind, part, lift, material) in [(Some(0), 2, 0.0, 0), (None, 0, 0.125, 2), (Some(1), 2, 0.0, 1)] {
         if let Some(m) = track_part(&track, kind, part, lift) {
             commands.spawn((Mesh3d(meshes.add(m)), MeshMaterial3d(materials.block(material)), DespawnOnExit(Screen::InGame)));
         }
@@ -228,7 +212,7 @@ fn spawn_blocks(mut commands: Commands, mut geometry: ResMut<LevelGeometry>, mat
         }
     }
 
-    let fade = NEAR - NEAR_FADE..NEAR + NEAR_FADE;
+    let fade = 192.0 - 32.0..192.0 + 32.0;
     let near = VisibilityRange { start_margin: 0.0..0.0, end_margin: fade.clone(), use_aabb: false };
     let far = VisibilityRange { start_margin: fade, end_margin: f32::MAX..f32::MAX, use_aabb: false };
 
@@ -266,8 +250,8 @@ fn spawn_terrain(mut commands: Commands, mut geometry: ResMut<LevelGeometry>, mu
 }
 
 fn spawn_water(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
-    let corners = [[WATER_MIN, WATER_MIN], [WATER_MAX, WATER_MIN], [WATER_MAX, WATER_MAX], [WATER_MIN, WATER_MAX]];
-    let plane = mesh(corners.map(|[x, z]| [x, WATER_LEVEL, z]).to_vec(), vec![[0.0, 1.0, 0.0]; 4], None, vec![0, 2, 1, 0, 3, 2]);
+    let corners = [[-4069.0, -4069.0], [2048.0, -4069.0], [2048.0, 2048.0], [-4069.0, 2048.0]];
+    let plane = mesh(corners.map(|[x, z]| [x, 23.0, z]).to_vec(), vec![[0.0, 1.0, 0.0]; 4], None, vec![0, 2, 1, 0, 3, 2]);
 
     let water = StandardMaterial { base_color: WATER, alpha_mode: AlphaMode::Blend, perceptual_roughness: 0.1, cull_mode: None, ..default() };
 

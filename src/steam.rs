@@ -5,8 +5,6 @@ pub struct Steam {
     pub requested_ticket: bool,
 }
 
-const MAX_TICKET: usize = 0x400;
-
 impl Steam {
     pub fn init() -> Self {
         Self { client: steamworks::Client::init_app(272230).ok(), ticket: None, requested_ticket: false }
@@ -22,19 +20,19 @@ impl Steam {
         client.run_callbacks();
 
         if self.requested_ticket && self.ticket.is_none() {
-            let mut buf = [0u8; MAX_TICKET];
+            let mut buf = [0u8; 1024];
             let mut len = 0u32;
 
             let got = unsafe {
                 steamworks::sys::SteamAPI_ISteamUser_GetEncryptedAppTicket(
                     steamworks::sys::SteamAPI_SteamUser_v023(),
                     buf.as_mut_ptr().cast(),
-                    MAX_TICKET as i32,
+                    1024,
                     &mut len
                 )
             };
 
-            if got && len as usize <= MAX_TICKET {
+            if got && len as usize <= 1024 {
                 self.ticket = Some(buf[..len as usize].to_vec());
             }
         }

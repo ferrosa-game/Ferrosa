@@ -29,13 +29,6 @@ use crate::menu::Screen;
 const GRAVITY: f32 = 9.8 / 60.0 / 60.0;
 const LIFT: f32 = 1.0 / 64.0;
 const RESTING_LIFT: f32 = 1.0 / 512.0;
-const UPRIGHT: f32 = 0.707;
-const RICOCHET: i32 = 0;
-const BODY: i32 = 1;
-const METAL: i32 = 2;
-const GRAZE: i32 = 3;
-const CASE_MODEL: &str = "models/items/case.glb";
-const CHIP_MODEL: &str = "models/items/chip.glb";
 const CHIP_COLOUR: Color = Color::srgb(0.3, 0.3, 0.3);
 const BLOOD_SHADE: Color = Color::srgb(0.25, 0.0, 0.0);
 const GLASS: Color = Color::srgba(0.6, 0.7, 0.75, 0.35);
@@ -114,7 +107,7 @@ pub fn empty_mesh(topology: PrimitiveTopology, vertices: usize) -> Mesh {
 
 fn spawn_effect_assets(mut commands: Commands, assets: Res<AssetServer>, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, mut images: ResMut<Assets<Image>>) {
     let primitive = |path: &str| assets.load(GltfAssetLabel::Primitive { mesh: 0, primitive: 0 }.from_asset(path.to_string()));
-    let case_texture = assets.load(GltfAssetLabel::Texture(0).from_asset(CASE_MODEL));
+    let case_texture = assets.load(GltfAssetLabel::Texture(0).from_asset("models/items/case.glb"));
     let case_material = materials.add(StandardMaterial { base_color_texture: Some(case_texture), metallic: 0.5, perceptual_roughness: 0.125, ..default() });
     let chip_material = materials.add(StandardMaterial { base_color: CHIP_COLOUR, perceptual_roughness: 0.9, ..default() });
 
@@ -133,7 +126,7 @@ fn spawn_effect_assets(mut commands: Commands, assets: Res<AssetServer>, mut mes
     commands.spawn((Mesh3d(blood.clone()), MeshMaterial3d(materials.add(blood_material)), NoFrustumCulling, NotShadowCaster, DespawnOnExit(Screen::InGame)));
     commands.spawn((Mesh3d(glass.clone()), MeshMaterial3d(materials.add(glass_material)), NoFrustumCulling, NotShadowCaster, DespawnOnExit(Screen::InGame)));
 
-    commands.insert_resource(EffectAssets { case: (primitive(CASE_MODEL), case_material), chip: (primitive(CHIP_MODEL), chip_material), spots, blood, glass });
+    commands.insert_resource(EffectAssets { case: (primitive("models/items/case.glb"), case_material), chip: (primitive("models/items/chip.glb"), chip_material), spots, blood, glass });
 }
 
 fn random_vec3(scale: f32, base: f32) -> Vec3 {
@@ -148,7 +141,7 @@ fn byte() -> f32 {
 }
 
 pub fn frame_across(n: Vec3) -> (Vec3, Vec3) {
-    let axis = if n.y.abs() >= UPRIGHT { Vec3::X } else { Vec3::Y };
+    let axis = if n.y.abs() >= 0.707 { Vec3::X } else { Vec3::Y };
     let side = axis.cross(n).normalize_or_zero();
 
     (side, n.cross(side).normalize_or_zero())
@@ -211,22 +204,22 @@ fn emit_effects(
 
                 pieces::spawn_piece(&mut commands, &effect_assets, asphalt, &mut particles, PieceKind::Case, pos, vel, axes);
             }
-            NetEvent::BulletHit { hit: RICOCHET, pos, normal } => {
+            NetEvent::BulletHit { hit: 0, pos, normal } => {
                 for _ in 0..3 {
                     let vel = normal * (1.0 / 60.0) + random_vec3(0.05, 0.0);
 
                     pieces::spawn_piece(&mut commands, &effect_assets, asphalt, &mut particles, PieceKind::Chip, pos, vel, [Vec3::X, Vec3::Y, Vec3::Z]);
                 }
             }
-            NetEvent::BulletHit { hit: hit @ (BODY | GRAZE), pos, .. } => {
-                for _ in 0..if hit == BODY { 16 } else { 4 } {
+            NetEvent::BulletHit { hit: hit @ (1 | 3), pos, .. } => {
+                for _ in 0..if hit == 1 { 16 } else { 4 } {
                     let size = blood();
                     let mut p = Particle::new(Kind::Blood, pos, random_vec3(1.0 / 30.0, 1.0 / 120.0));
                     p.size = size * 0.25;
                     particles.list.push(p);
                 }
             }
-            NetEvent::BulletHit { hit: METAL, pos, .. } => {
+            NetEvent::BulletHit { hit: 2, pos, .. } => {
                 for _ in 0..8 {
                     let mut p = Particle::new(Kind::Smoke, pos, random_vec3(1.0 / 30.0, 1.0 / 120.0));
                     (p.life, p.size, p.drag) = (60, small(), 0.975);

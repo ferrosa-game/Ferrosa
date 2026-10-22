@@ -19,17 +19,17 @@ use crate::{
     menu::Screen,
 };
 
-const SCREEN_SIZE: u32 = 0x200;
-const PAGE_SIZE: u32 = 0x400;
+const SCREEN_SIZE: u32 = 512;
+const PAGE_SIZE: u32 = 1024;
 const GREY: [u8; 3] = [0x80; 3];
 const BLACK: [u8; 3] = [0; 3];
 const SCREEN_BOTTOM: u32 = 384;
-const SCREEN_LINES: usize = 0x20;
-const SHOWN_LINES: usize = 0x17;
+const SCREEN_LINES: usize = 32;
+const SHOWN_LINES: usize = 23;
 const SCREEN_TEXT: f32 = 16.0;
 const PAGE_TEXT: f32 = 32.0;
 const HEADLINE: f32 = 48.0;
-const MEMO_SIZE: usize = 0x400;
+const MEMO_SIZE: usize = 1024;
 const MATERIAL: &str = "texture";
 const PALETTE: [[f32; 3]; 16] = [
     [0.0, 0.0, 0.0],
@@ -91,11 +91,6 @@ const ARCADE_GLYPHS: [[u8; 8]; 40] = [
     [0x00, 0x7e, 0x7e, 0x0c, 0x18, 0x30, 0x7e, 0x7e],
     [0x00; 8],
 ];
-const BLANK_GLYPH: usize = 0x27;
-const FIRST_LETTER: usize = 0xd;
-const ARCADE_CELL: u32 = 16;
-const CHOMPER: u32 = 32;
-const MOUTH: f64 = 3.0 * PI / 16.0;
 
 #[derive(Component)]
 struct ScreenItem {
@@ -260,7 +255,7 @@ fn newspaper(item: &Item, rockwell: &FontRef) -> Canvas {
 }
 
 fn chomper(c: &mut Canvas, x: i32, y: i32) {
-    let scale = (CHOMPER / 16) as i32;
+    let scale = 32 / 16;
 
     for i in 0..16 {
         for j in 0..16 {
@@ -268,7 +263,7 @@ fn chomper(c: &mut Canvas, x: i32, y: i32) {
             let r = ((j as f32 - 7.5).powi(2) + dy * dy).sqrt();
             let a = (dy as f64).atan2((j as f32 - 5.0) as f64);
 
-            if r <= 6.0 && !(-MOUTH < a && a < MOUTH) {
+            if r <= 6.0 && !(-(3.0 * PI / 16.0) < a && a < (3.0 * PI / 16.0)) {
                 c.fill(x + j * scale, y + i * scale, scale, scale, [0xff; 3]);
             }
         }
@@ -277,13 +272,13 @@ fn chomper(c: &mut Canvas, x: i32, y: i32) {
 
 fn arcade(item: &Item) -> Canvas {
     let mut c = Canvas::new(SCREEN_SIZE);
-    let scale = (ARCADE_CELL / 8) as i32;
+    let scale = 16 / 8;
 
     c.fill(0, 0, SCREEN_SIZE as i32, SCREEN_BOTTOM as i32, BLACK);
 
     for (n, &b) in b"HELLO WORLD".iter().enumerate() {
-        let glyph = if b.is_ascii_uppercase() { (b - b'A') as usize + FIRST_LETTER } else { BLANK_GLYPH };
-        let x = n as i32 * ARCADE_CELL as i32 + 16;
+        let glyph = if b.is_ascii_uppercase() { (b - b'A') as usize + 13 } else { 39 };
+        let x = n as i32 * 16_i32 + 16;
 
         for (row, bits) in ARCADE_GLYPHS[glyph].iter().enumerate() {
             for k in 0..8 {

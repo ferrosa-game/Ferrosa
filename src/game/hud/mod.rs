@@ -10,19 +10,12 @@ use ferrosa_protocol::clientbound::game::{GameState, ItemKind, MenuType, OwnHuma
 
 use super::{
     GAME_SCREEN,
-    escape_menu::BACKDROP_LAYER,
     netgame::{NetGame, entities::{Human, Player}},
 };
 use crate::{
     fonts::GameFonts,
     menu::{MENU_BACKGROUND, Screen},
 };
-
-pub use phone::DIALLING;
-
-const PAIN_PER_SHADE: f32 = 64.0;
-const DARKEST: f32 = 0.75;
-const DAMAGE_LAYER: i32 = 1;
 
 pub mod align {
     pub const CENTRE_X: u32 = 1;
@@ -184,10 +177,10 @@ fn spawn_hud(mut commands: Commands, fonts: Res<GameFonts>) {
     timer::spawn(&mut commands, &fonts);
 
     let backdrop = Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), ..default() };
-    commands.spawn((backdrop, Backdrop, BackgroundColor(MENU_BACKGROUND), Visibility::Hidden, GlobalZIndex(BACKDROP_LAYER), Pickable::IGNORE, DespawnOnExit(Screen::InGame)));
+    commands.spawn((backdrop, Backdrop, BackgroundColor(MENU_BACKGROUND), Visibility::Hidden, GlobalZIndex(2), Pickable::IGNORE, DespawnOnExit(Screen::InGame)));
 
     let full = Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), ..default() };
-    commands.spawn((full, DamageFade, BackgroundColor(Color::NONE), GlobalZIndex(DAMAGE_LAYER), Pickable::IGNORE, DespawnOnExit(Screen::InGame)));
+    commands.spawn((full, DamageFade, BackgroundColor(Color::NONE), GlobalZIndex(1), Pickable::IGNORE, DespawnOnExit(Screen::InGame)));
 }
 
 fn show_hud(net: Option<Res<NetGame>>, mut screens: Query<&mut Visibility, With<HudScreen>>) {
@@ -203,7 +196,7 @@ fn show_backdrop(net: Res<NetGame>, mut backdrop: Single<&mut Visibility, With<B
 }
 
 fn fade_for_damage(net: Res<NetGame>, mut fade: Single<&mut BackgroundColor, With<DamageFade>>) {
-    let dark = own(&net).map_or(0.0, |(_, _, own)| (own.pain.max(0) as f32 / PAIN_PER_SHADE).min(DARKEST));
+    let dark = own(&net).map_or(0.0, |(_, _, own)| (own.pain.max(0) as f32 / 64.0).min(0.75));
     let colour = Color::BLACK.with_alpha(dark);
 
     if fade.0 != colour {

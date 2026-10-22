@@ -8,17 +8,12 @@ use bevy::{
 };
 
 pub const BONES: usize = 16;
-pub const SHADOW_ONLY: usize = 1;
 const BONE_NAMES: [&str; BONES] = [
     "Pelvis", "Stomach", "Torso", "Head", "ShoulderL", "ForearmL", "HandL", "ShoulderR", "ForearmR", "HandR", "ThighL", "ShinL", "FootL", "ThighR",
     "ShinR", "FootR",
 ];
 pub const PARENTS: [usize; BONES] = [0, 0, 1, 2, 2, 4, 5, 2, 7, 8, 0, 10, 11, 0, 13, 14];
 const PELVIS_DROP: Vec3 = Vec3::new(0.0, -0.125, 0.0);
-const HEAD_MOUNT: &str = "HeadMount";
-pub const HEADS: usize = 5;
-pub const HAIRS: usize = 9;
-const MODEL_SLOTS: usize = 0x18;
 const MODEL_FILES: [(usize, &str); 12] = [
     (0, "fcasual1"),
     (1, "fsuit1"),
@@ -126,7 +121,7 @@ fn body_models(look: &HumanLook) -> [Option<&'static str>; 3] {
     let body = kind + if look.gender == 1 { 8 } else { 0 };
     let tie = (look.tie_colour > 0).then_some(0x10 + look.gender as usize * 2);
     let necklace = (look.necklace > 0).then_some(look.necklace as usize + look.gender as usize * 2 + 0x13);
-    [Some(body), tie, necklace].map(|s| s.filter(|&s| s < MODEL_SLOTS).and_then(|s| MODEL_FILES.iter().find(|f| f.0 == s).map(|f| f.1)))
+    [Some(body), tie, necklace].map(|s| s.filter(|&s| s < 24).and_then(|s| MODEL_FILES.iter().find(|f| f.0 == s).map(|f| f.1)))
 }
 
 fn build_humans(
@@ -147,8 +142,8 @@ fn build_humans(
         }
         commands.entity(human).insert(shape);
         let g = if look.gender == 1 { "m" } else { "f" };
-        let head = (look.head < HEADS as u32).then(|| format!("{g}head{}", look.head + 1));
-        let hair = (look.hair < HAIRS as u32).then(|| format!("{g}hair{}", look.hair + 1));
+        let head = (look.head < 5).then(|| format!("{g}head{}", look.head + 1));
+        let hair = (look.hair < 9).then(|| format!("{g}hair{}", look.hair + 1));
         for (k, name) in body_models(look).into_iter().enumerate() {
             let Some(name) = name else { continue };
             let part = if k == 0 { HumanPart::Body { head: head.clone(), hair: hair.clone() } } else { HumanPart::Extra };
@@ -175,7 +170,7 @@ fn part_ready(
         if let Ok(name) = names.get(e) {
             if let Some(k) = BONE_NAMES.iter().position(|b| *b == name.as_str()) {
                 joints[k] = Some(e);
-            } else if name.as_str() == HEAD_MOUNT {
+            } else if name.as_str() == "HeadMount" {
                 mount = Some(e);
             }
         }
@@ -218,7 +213,7 @@ fn hide_heads(
         for mesh in std::iter::once(e).chain(children.iter_descendants(e)) {
             match (meshes.get(mesh), hide) {
                 (Ok(false), true) => {
-                    commands.entity(mesh).insert(RenderLayers::layer(SHADOW_ONLY));
+                    commands.entity(mesh).insert(RenderLayers::layer(1));
                 }
                 (Ok(true), false) => {
                     commands.entity(mesh).remove::<RenderLayers>();

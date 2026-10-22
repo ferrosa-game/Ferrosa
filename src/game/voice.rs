@@ -16,14 +16,14 @@ use super::{
     chat::ChatState,
     hud::{Stick, align, rect, spawn_screen},
     human_sync::{NetHuman, bone_at},
-    netgame::{NetGame, VOICE_CHANNELS},
+    netgame::NetGame,
     network::NetTick,
     smoothing::Smoothing,
     sounds::{Ears, Emitter},
 };
 use crate::{
     keys::{mouse_button_bit, scancode},
-    audio::{MIC_RATE, MicSamples, Speakers},
+    audio::{MicSamples, Speakers},
     config::Config,
     character_model::HumanPose,
     menu::{
@@ -32,25 +32,8 @@ use crate::{
 };
 
 const FRAME: usize = 960;
-const MAX_DECODE: usize = 0x800;
-const BITRATE: i32 = 16000;
-const MAX_PACKET: usize = 0x800;
-const CAPTURES: usize = 16;
-const MAX_QUIET: i32 = 0x40;
-const ACTIVATION_TAIL: i32 = 0xf;
-const HOLD_TAIL: i32 = 0x17;
-const DECODES: usize = 8;
-const STREAM_FULL: usize = 0x167f;
-const MAX_LAG: usize = 0x10;
-const CATCH_UP: usize = 8;
-const RING: usize = 0x40;
-const SIGHT_RANGE: f32 = 128.0;
-const BLOCKED: f32 = 0.5;
-const SIGHT_EASE: f32 = 0.125;
-const THROUGH_ITEM: f32 = 1.0;
 const REACH: [f32; 3] = [2.0, 6.0, 16.0];
 const QUIETEST_DB: f32 = -48.0;
-const METER_FALL: f32 = 0.85;
 const METER_AT: Vec2 = Vec2::new(948.0, 36.0);
 const METER: Vec2 = Vec2::new(56.0, 8.0);
 const METER_GAP: f32 = 16.0;
@@ -91,12 +74,12 @@ struct Microphone(Mutex<Encoder>);
 
 impl Default for Microphone {
     fn default() -> Self {
-        let opus = OpusEncoder::new(MIC_RATE as i32, 1, Application::Voip).ok().map(|mut e| {
-            e.bitrate_bps = BITRATE;
+        let opus = OpusEncoder::new(48000, 1, Application::Voip).ok().map(|mut e| {
+            e.bitrate_bps = 16000;
             e
         });
 
-        Self(Mutex::new(Encoder { opus, quiet: 0, pcm: vec![0.0; FRAME], packet: vec![0; MAX_PACKET] }))
+        Self(Mutex::new(Encoder { opus, quiet: 0, pcm: vec![0.0; FRAME], packet: vec![0; 2048] }))
     }
 }
 
@@ -121,7 +104,7 @@ impl Source for Stream {
     }
 
     fn sample_rate(&self) -> SampleRate {
-        NonZero::new(MIC_RATE).expect("a rate")
+        NonZero::new(48000).expect("a rate")
     }
 
     fn total_duration(&self) -> Option<Duration> {
@@ -141,7 +124,7 @@ struct Channel {
 
 impl Default for Channel {
     fn default() -> Self {
-        Self { decoder: None, stream: Stream(Arc::default()), emitter: None, speaker: None, read: 0, sight: 1.0, out: vec![0.0; MAX_DECODE] }
+        Self { decoder: None, stream: Stream(Arc::default()), emitter: None, speaker: None, read: 0, sight: 1.0, out: vec![0.0; 2048] }
     }
 }
 
@@ -150,7 +133,7 @@ struct Voices(Mutex<Vec<Channel>>);
 
 impl Default for Voices {
     fn default() -> Self {
-        Self(Mutex::new((0..VOICE_CHANNELS).map(|_| Channel::default()).collect()))
+        Self(Mutex::new((0..8).map(|_| Channel::default()).collect()))
     }
 }
 
@@ -190,9 +173,9 @@ fn record(
     let holding = config.voice_hold_to_talk != 0;
     let pressed = talking(&config, &keys, &mouse);
 
-    level.0 *= METER_FALL;
+    level.0 *= 0.85;
 
-    for _ in 0..CAPTURES {
+    for _ in 0..16 {
         if captured.len() < FRAME {
             break;
         }
@@ -206,9 +189,9 @@ fn record(
         encoder.pcm.iter_mut().zip(&frame).for_each(|(p, &s)| *p = s as f32 / 32768.0);
 
         let speaking = if holding { pressed } else { loud };
-        let tail = if holding { HOLD_TAIL } else { ACTIVATION_TAIL };
+        let tail = if holding { 23 } else { 15 };
 
-        encoder.quiet = if speaking { 0 } else { (encoder.quiet + 1).min(MAX_QUIET) };
+        encoder.quiet = if speaking { 0 } else { (encoder.quiet + 1).min(64) };
 
         let silent = encoder.quiet > tail;
         let data = if silent { Vec::new() } else { encoder.encode() };
@@ -218,7 +201,7 @@ fn record(
         net.voice_out[slot].data = data;
         net.voice_out[slot].volume = chat.level as u8;
         net.silenced = silent;
-        net.voice_out_next = (slot + 1) % RING;
+        net.voice_out_next = (slot + 1) % 64;
     }
 }
 
@@ -274,9 +257,9 @@ fn show_meter(
 
 pub fn line_of_sight(level: &Level, from: Vec3, to: Vec3) -> f32 {
     let map = &level.map;
-    let clear = from.distance(to) <= SIGHT_RANGE && line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, from, to).is_none();
+    let clear = from.distance(to) <= 128.0 && line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, from, to).is_none();
 
-    if clear { 1.0 } else { BLOCKED }
+    if clear { 1.0 } else { 0.5 }
 }
 
 fn play_voices(
@@ -308,8 +291,8 @@ fn play_voices(
         }
 
         if channel.speaker != Some(sent.player) {
-            channel.decoder = OpusDecoder::new(MIC_RATE as i32, 1).ok();
-            channel.read = (sent.next + RING - CATCH_UP) % RING;
+            channel.decoder = OpusDecoder::new(48000, 1).ok();
+            channel.read = (sent.next + 64 - 8) % 64;
             channel.speaker = Some(sent.player);
             channel.stream.0.lock().map(|mut s| s.clear()).ok();
         }
@@ -318,8 +301,8 @@ fn play_voices(
         let item = usize::try_from(sent.item).ok().and_then(|i| net.items.get(i)).filter(|i| i.active).map(|i| i.track.pos);
         let at = head.filter(|_| !restarting).or(item).unwrap_or(listener);
 
-        for _ in 0..DECODES {
-            let full = channel.stream.0.lock().map_or(true, |s| s.len() > STREAM_FULL);
+        for _ in 0..8 {
+            let full = channel.stream.0.lock().map_or(true, |s| s.len() > 5759);
 
             if full || channel.read == sent.next {
                 break;
@@ -329,26 +312,26 @@ fn play_voices(
             let data = &frame.data[..(frame.size as usize).min(frame.data.len())];
 
             if let Some(decoder) = channel.decoder.as_mut() {
-                let decoded = decoder.decode(data, if data.is_empty() { FRAME } else { MAX_DECODE }, &mut channel.out).unwrap_or(0);
+                let decoded = decoder.decode(data, if data.is_empty() { 960 } else { 2048 }, &mut channel.out).unwrap_or(0);
                 let silence = data.is_empty();
 
                 if let Ok(mut stream) = channel.stream.0.lock() {
-                    stream.extend(channel.out[..decoded.min(MAX_DECODE)].iter().map(|&s| if silence { 0.0 } else { s }));
+                    stream.extend(channel.out[..decoded.min(2048)].iter().map(|&s| if silence { 0.0 } else { s }));
                 }
             }
 
-            channel.read = (channel.read + 1) % RING;
+            channel.read = (channel.read + 1) % 64;
         }
 
-        if (sent.next + RING - channel.read) % RING > MAX_LAG {
-            channel.read = (sent.next + RING - CATCH_UP) % RING;
+        if (sent.next + 64 - channel.read) % 64 > 16 {
+            channel.read = (sent.next + 64 - 8) % 64;
         }
 
-        let newest = &sent.frames[(sent.next + RING - 1) % RING];
-        let radius = if item.is_some() && head.is_none() { THROUGH_ITEM } else { REACH[(newest.volume as usize).min(REACH.len() - 1)] };
+        let newest = &sent.frames[(sent.next + 64 - 1) % 64];
+        let radius = if item.is_some() && head.is_none() { 1.0 } else { REACH[(newest.volume as usize).min(REACH.len() - 1)] };
         let sight = level.as_ref().map_or(1.0, |l| line_of_sight(l, at, listener));
 
-        channel.sight += (sight - channel.sight) * SIGHT_EASE;
+        channel.sight += (sight - channel.sight) * 0.125;
 
         let emitter = channel.emitter.get_or_insert_with(|| {
             let emitter = Emitter::new(mixer, at, radius, &ears);

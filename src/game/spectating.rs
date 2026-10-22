@@ -13,8 +13,6 @@ use super::{
 };
 use crate::{fonts::GameFonts, menu::Screen, names::TEAM_COLOURS};
 
-const WATCHED_FALLBACK: usize = 2;
-const LISTED_FALLBACK: usize = 6;
 const LIST_AT: Vec2 = Vec2::new(752.0, 64.0);
 const LINE: f32 = 20.0;
 const NO_ONE: i32 = -1;
@@ -186,7 +184,7 @@ fn show_spectator_hud(
             t.0 = who;
         }
 
-        c.set_if_neq(TextColor(team_colour(team, WATCHED_FALLBACK)));
+        c.set_if_neq(TextColor(team_colour(team, 2)));
     }
 
     let now = Listed(net.players.iter().filter(|p| p.active && !p.is_bot && p.human < 0).map(|p| (p.name.clone(), p.team, Voice::of(p))).collect());
@@ -201,7 +199,7 @@ fn show_spectator_hud(
         let row = commands.spawn((Node { height: px(LINE), align_items: AlignItems::Center, ..default() }, Pickable::IGNORE, ChildOf(*list))).id();
 
         voice_icon(&mut commands, row, &icons, *voice, LINE, None);
-        commands.spawn((shadowed(who.clone(), &fonts.rockwell, LINE, team_colour(*team, LISTED_FALLBACK)), ChildOf(row)));
+        commands.spawn((shadowed(who.clone(), &fonts.rockwell, LINE, team_colour(*team, 6)), ChildOf(row)));
     }
 
     *listed = now;

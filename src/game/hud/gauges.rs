@@ -6,8 +6,6 @@ use ferrosa_protocol::clientbound::game::GameState;
 use super::{align, anchored, colour, line, own, rect, shown, text};
 use crate::game::netgame::NetGame;
 
-const DRIVING: u32 = 2;
-const FLYING: u32 = 3;
 const GEAR_LABELS: [(&str, f32, f32); 6] = [("1", 818.0, 420.0), ("2", 818.0, 476.0), ("3", 850.0, 420.0), ("4", 850.0, 476.0), ("A", 882.0, 420.0), ("R", 882.0, 476.0)];
 
 #[derive(Component)]
@@ -66,18 +64,18 @@ pub(super) fn show_gauges(
     let driving = own(&net).filter(|(_, h, _)| net.game_state != GameState::Restarting && h.vehicle >= 0 && h.vehicle_seat == 0);
     let input = driving.map_or(0, |(p, _, _)| p.last_input_type);
 
-    car.iter_mut().for_each(|mut v| shown(&mut v, input == DRIVING));
-    collective.iter_mut().for_each(|mut v| shown(&mut v, input == FLYING));
+    car.iter_mut().for_each(|mut v| shown(&mut v, input == 2));
+    collective.iter_mut().for_each(|mut v| shown(&mut v, input == 3));
 
     for (mut node, mut v) in &mut lever {
-        shown(&mut v, input == FLYING);
+        shown(&mut v, input == 3);
 
         if let Some((p, _, _)) = driving {
             node.top = px(448.0 - 32.0 * p.forward_back - 8.0);
         }
     }
 
-    let Some((p, h, _)) = driving.filter(|_| input == DRIVING) else { return };
+    let Some((p, h, _)) = driving.filter(|_| input == 2) else { return };
     let Some(v) = net.vehicles.get(h.vehicle as usize) else { return };
 
     let ticks = (v.track.tick - v.track.prev_tick).max(1) as f32;

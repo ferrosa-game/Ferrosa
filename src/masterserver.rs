@@ -18,14 +18,11 @@ use ferrosa_protocol::{
 
 use crate::{config::Config, names::phone_number, net::ClientSocket, steam::Steam};
 
-const MASTERSERVER_SITE: &str = "www.crypticsea.com";
-const SERVERINFO_TIMEOUT: Duration = Duration::from_secs(3);
 pub const FALLBACK: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(66, 226, 72, 227), 0x6bc8);
-const DEFAULT_NAME: &str = "Player";
 
 pub fn get_masterserver_info() -> Option<SocketAddrV4> {
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().ok()?;
-    match runtime.block_on(async { tokio::time::timeout(SERVERINFO_TIMEOUT, resolve_address(MASTERSERVER_SITE, None)).await }) {
+    match runtime.block_on(async { tokio::time::timeout(Duration::from_secs(3), resolve_address("www.crypticsea.com", None)).await }) {
         Ok(Ok(SocketAddr::V4(addr))) => Some(addr),
         _ => None,
     }
@@ -133,7 +130,7 @@ fn start(mut commands: Commands, config: Option<Res<Config>>) {
     let mut steam = Steam::init();
     let name = if steam.user_id().is_some() { steam.persona_name() } else { None }.or_else(|| config.map(|c| c.name.clone())).filter(|n| !n.is_empty());
 
-    commands.insert_resource(PlayerName(name.map_or_else(|| DEFAULT_NAME.to_string(), |n| n.chars().take(0x1f).collect())));
+    commands.insert_resource(PlayerName(name.map_or_else(|| "Player".to_string(), |n| n.chars().take(0x1f).collect())));
     commands.insert_resource(steam);
     commands.insert_resource(ClientSocket::open());
     commands.insert_resource(ServerInfoFetch(IoTaskPool::get().spawn(async { get_masterserver_info() })));

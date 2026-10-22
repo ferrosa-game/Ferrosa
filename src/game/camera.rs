@@ -20,14 +20,6 @@ use super::{
 };
 use crate::{config::Config, character_model::HumanPose, menu::Screen};
 
-const STEP: f32 = 0.25;
-const FAST: f32 = 4.0;
-const SLOW: f32 = 0.25;
-const TURN: f32 = 1.0 / 320.0;
-const ZOOM_MIN: f32 = 2.0;
-const ZOOM_MAX: f32 = 32.0;
-const ZOOM_EASE: f32 = 1.0 / 16.0;
-
 #[derive(Component)]
 pub struct GameCamera;
 
@@ -168,7 +160,7 @@ fn fly_spectator(
         spectator.pos = head;
     }
 
-    let speed = STEP * if ***fast { FAST } else { 1.0 } * if ***slow { SLOW } else { 1.0 };
+    let speed = 0.25 * if ***fast { 4.0 } else { 1.0 } * if ***slow { 0.25 } else { 1.0 };
     let (across, up, back) = (fly.x, fly.y, fly.z);
     let (sin, cos) = spectator.yaw.sin_cos();
 
@@ -178,13 +170,13 @@ fn fly_spectator(
 
     let invert = if config.invert_mouse != 0 { -1.0 } else { 1.0 };
 
-    let turn = TURN * config.sensitivity();
+    let turn = (1.0 / 320.0) * config.sensitivity();
 
     spectator.yaw += look.x * turn;
     spectator.pitch = (spectator.pitch + invert * look.y * turn).clamp(-FRAC_PI_2, FRAC_PI_2);
 
-    spectator.zoom_target = (spectator.zoom_target - zoom.y).clamp(ZOOM_MIN, ZOOM_MAX);
-    spectator.zoom += (spectator.zoom_target - spectator.zoom) * (1.0 - (1.0 - ZOOM_EASE).powf(frames));
+    spectator.zoom_target = (spectator.zoom_target - zoom.y).clamp(2.0, 32.0);
+    spectator.zoom += (spectator.zoom_target - spectator.zoom) * (1.0 - (1.0 - 0.0625_f32).powf(frames));
 
     *transform = spectator.transform();
 }

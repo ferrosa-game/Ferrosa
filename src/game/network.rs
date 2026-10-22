@@ -8,8 +8,6 @@ use super::{
 };
 use crate::{menu::Screen, net::ClientSocket};
 
-pub const TICK_SECONDS: f64 = 0.016;
-
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum NetTick {
     Input,
@@ -24,7 +22,7 @@ pub struct NetworkPlugin;
 impl Plugin for NetworkPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<NetEvent>()
-            .insert_resource(Time::<Fixed>::from_seconds(TICK_SECONDS))
+            .insert_resource(Time::<Fixed>::from_seconds(1.0 / 60.0))
             .configure_sets(
                 FixedUpdate,
                 (NetTick::Input, NetTick::Send, NetTick::Receive, NetTick::Events, NetTick::Follow).chain().run_if(resource_exists::<NetGame>),

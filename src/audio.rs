@@ -12,8 +12,6 @@ use rodio::{DeviceSinkBuilder, MixerDeviceSink, mixer::Mixer};
 
 use crate::config::config_dir;
 
-pub const MIC_RATE: u32 = 48000;
-const MIC_KEPT: usize = MIC_RATE as usize;
 const DEVICES_FILE: &str = "audio_devices.txt";
 const DEFAULT_DEVICE: &str = "Default";
 
@@ -95,7 +93,7 @@ fn open_microphone(name: &str, samples: MicSamples) -> Option<cpal::Stream> {
     let device = if name == DEFAULT_DEVICE { host.default_input_device() } else { find(host.input_devices().ok(), name) }?;
     let config = device.default_input_config().inspect_err(|e| warn!("audio input {name} has no config: {e}")).ok()?;
     let (channels, rate, format) = (config.channels() as usize, config.sample_rate(), config.sample_format());
-    let mut resampler = Resampler { step: MIC_RATE as f64 / rate as f64, phase: 0.0, samples };
+    let mut resampler = Resampler { step: 48000.0 / rate as f64, phase: 0.0, samples };
     let error = |e: cpal::Error| warn!("microphone: {e}");
 
     let stream = match format {
@@ -135,7 +133,7 @@ impl Resampler {
             }
         }
 
-        let excess = out.len().saturating_sub(MIC_KEPT);
+        let excess = out.len().saturating_sub(48000);
         out.drain(..excess);
     }
 }

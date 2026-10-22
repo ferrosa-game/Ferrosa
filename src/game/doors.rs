@@ -4,8 +4,6 @@ use ferrosa_world::city_objects::{GARAGE_DOOR, object_pose};
 use super::{Level, netgame::NetGame};
 use crate::menu::Screen;
 
-const DOOR_MODEL: &str = "models/objects/object_6.glb";
-
 #[derive(Component)]
 struct TeamDoor(usize);
 
@@ -19,7 +17,7 @@ impl Plugin for DoorsPlugin {
 
 fn spawn_doors(mut commands: Commands, assets: Res<AssetServer>, level: Res<Level>) {
     let area = &level.map.level.area;
-    let model = assets.load(GltfAssetLabel::Scene(0).from_asset(DOOR_MODEL));
+    let model = assets.load(GltfAssetLabel::Scene(0).from_asset("models/objects/object_6.glb"));
 
     for (team, base) in level.map.level.bases.iter().enumerate() {
         let Some((cells, dir)) = base.door else { continue };
