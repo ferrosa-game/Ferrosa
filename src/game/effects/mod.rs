@@ -17,7 +17,6 @@ use ferrosa_world::{map::Map, trace::line_intersect_level};
 use self::pieces::{Piece, PieceKind};
 use super::{
     Level, blocks,
-    items::ItemTypes,
     level_render::{AsphaltMaterial, BlockPanes, centred_mesh},
     netgame::{NetEvent, NetGame},
     network::NetTick,
@@ -28,7 +27,6 @@ use super::{
 use crate::menu::Screen;
 
 const GRAVITY: f32 = 9.8 / 60.0 / 60.0;
-pub(super) const FLASH_LIFE: i32 = 4;
 const LIFT: f32 = 1.0 / 64.0;
 const RESTING_LIFT: f32 = 1.0 / 512.0;
 const UPRIGHT: f32 = 0.707;
@@ -48,7 +46,6 @@ enum Kind {
     Smoke,
     Shard,
     Triangle,
-    Flash,
 }
 
 #[derive(Clone, Copy)]
@@ -65,12 +62,11 @@ struct Particle {
     rest: [f32; 3],
     spin_axis: Vec3,
     spin: f32,
-    gun: Option<usize>,
 }
 
 impl Particle {
     fn new(kind: Kind, pos: Vec3, vel: Vec3) -> Self {
-        Self { kind, life: 65535, gravity: GRAVITY, drag:0.9975, size: 0.0, pos, vel, frame: [Vec3::ZERO; 3], corner_vel: [Vec3::ZERO; 3], rest: [0.0; 3], spin_axis: Vec3::ZERO, spin: 0.0, gun: None }
+        Self { kind, life: 65535, gravity: GRAVITY, drag:0.9975, size: 0.0, pos, vel, frame: [Vec3::ZERO; 3], corner_vel: [Vec3::ZERO; 3], rest: [0.0; 3], spin_axis: Vec3::ZERO, spin: 0.0 }
     }
 }
 
@@ -88,7 +84,6 @@ struct EffectAssets {
     spots: Handle<Mesh>,
     blood: Handle<Mesh>,
     glass: Handle<Mesh>,
-    flash: Handle<Mesh>,
 }
 
 pub struct EffectsPlugin;
@@ -101,7 +96,7 @@ impl Plugin for EffectsPlugin {
                 FixedUpdate,
                 (emit_effects, simulate_particles, pieces::simulate_pieces).chain().in_set(NetTick::Follow).run_if(in_state(Screen::InGame)).run_if(resource_exists::<EffectAssets>),
             )
-            .add_systems(Update, (draw::draw_particles.after(Smoothing::Glide), draw::light_flashes.after(Smoothing::Glide), pieces::place_pieces).run_if(in_state(Screen::InGame)).run_if(resource_exists::<EffectAssets>))
+            .add_systems(Update, (draw::draw_particles.after(Smoothing::Glide), pieces::place_pieces).run_if(in_state(Screen::InGame)).run_if(resource_exists::<EffectAssets>))
             .add_systems(OnExit(Screen::InGame), |mut commands: Commands, mut particles: ResMut<Particles>| {
                 *particles = Particles::default();
                 commands.remove_resource::<EffectAssets>();
@@ -129,24 +124,16 @@ fn spawn_effect_assets(mut commands: Commands, assets: Res<AssetServer>, mut mes
     let spots = meshes.add(empty_mesh(PrimitiveTopology::TriangleList, 3));
     let blood = meshes.add(empty_mesh(PrimitiveTopology::TriangleList, 3));
     let glass = meshes.add(empty_mesh(PrimitiveTopology::TriangleList, 3));
-    let flash = meshes.add(empty_mesh(PrimitiveTopology::TriangleList, 3));
     let spot_image = images.add(spot);
     let spot_material = StandardMaterial { base_color: Color::WHITE, base_color_texture: Some(spot_image.clone()), unlit: true, alpha_mode: AlphaMode::Blend, cull_mode: None, ..default() };
-    let flash_material = StandardMaterial { base_color: Color::WHITE, base_color_texture: Some(spot_image.clone()), unlit: true, alpha_mode: AlphaMode::Add, cull_mode: None, ..default() };
     let blood_material = StandardMaterial { base_color: BLOOD_SHADE, base_color_texture: Some(spot_image), perceptual_roughness: 1.0, alpha_mode: AlphaMode::Blend, cull_mode: None, ..default() };
     let glass_material = StandardMaterial { base_color: GLASS, alpha_mode: AlphaMode::Blend, perceptual_roughness: 0.05, reflectance: 1.0, double_sided: true, cull_mode: None, ..default() };
 
     commands.spawn((Mesh3d(spots.clone()), MeshMaterial3d(materials.add(spot_material)), NoFrustumCulling, NotShadowCaster, DespawnOnExit(Screen::InGame)));
     commands.spawn((Mesh3d(blood.clone()), MeshMaterial3d(materials.add(blood_material)), NoFrustumCulling, NotShadowCaster, DespawnOnExit(Screen::InGame)));
     commands.spawn((Mesh3d(glass.clone()), MeshMaterial3d(materials.add(glass_material)), NoFrustumCulling, NotShadowCaster, DespawnOnExit(Screen::InGame)));
-    commands.spawn((Mesh3d(flash.clone()), MeshMaterial3d(materials.add(flash_material)), NoFrustumCulling, NotShadowCaster, DespawnOnExit(Screen::InGame)));
 
-    for _ in 0..draw::FLASH_LIGHTS {
-        let light = PointLight { color: draw::FLASH_LIGHT_COLOUR, intensity: 0.0, range: draw::FLASH_RANGE, shadow_maps_enabled: false, ..default() };
-        commands.spawn((light, Transform::default(), Visibility::Hidden, draw::FlashLight, DespawnOnExit(Screen::InGame)));
-    }
-
-    commands.insert_resource(EffectAssets { case: (primitive(CASE_MODEL), case_material), chip: (primitive(CHIP_MODEL), chip_material), spots, blood, glass, flash });
+    commands.insert_resource(EffectAssets { case: (primitive(CASE_MODEL), case_material), chip: (primitive(CHIP_MODEL), chip_material), spots, blood, glass });
 }
 
 fn random_vec3(scale: f32, base: f32) -> Vec3 {
@@ -194,7 +181,6 @@ fn emit_effects(
     net: Res<NetGame>,
     level: Option<ResMut<Level>>,
     types: Option<Res<VehicleTypes>>,
-    item_types: Option<Res<ItemTypes>>,
     effect_assets: Res<EffectAssets>,
     mut particles: ResMut<Particles>,
     mut happenings: MessageReader<NetEvent>,
@@ -216,7 +202,7 @@ fn emit_effects(
 
     for happening in fresh {
         match happening {
-            NetEvent::Gunshot { kind, item, pos, .. } => {
+            NetEvent::Gunshot { item, pos, .. } => {
                 let Some(gun) = usize::try_from(item).ok() else { continue };
                 let Some(it) = net.items.get(gun) else { continue };
                 let turn = it.rot.conjugate();
@@ -224,15 +210,6 @@ fn emit_effects(
                 let vel = (axes[0] + axes[1]) * 0.025 + random_vec3(1.0 / 60.0, 0.0);
 
                 pieces::spawn_piece(&mut commands, &effect_assets, asphalt, &mut particles, PieceKind::Case, pos, vel, axes);
-
-                let muzzle = kind.and_then(|k| item_types.as_ref()?.0.get(k as usize)?.muzzle_flash);
-
-                if let Some(muzzle) = muzzle {
-                    let mut p = Particle::new(Kind::Flash, muzzle, Vec3::ZERO);
-                    (p.life, p.drag, p.gun) = (FLASH_LIFE, 0.0, Some(gun));
-
-                    particles.list.push(p);
-                }
             }
             NetEvent::BulletHit { hit: RICOCHET, pos, normal } => {
                 for _ in 0..3 {

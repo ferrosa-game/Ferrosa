@@ -18,6 +18,7 @@ mod human_sync;
 mod inventory;
 mod items;
 mod mute;
+mod muzzle;
 mod level_render;
 mod loading;
 mod map;
@@ -88,7 +89,7 @@ impl Plugin for GamePlugin {
                 briefing::BriefingPlugin
             ),
         ))
-        .add_plugins((eliminator::EliminatorPlugin, admin::AdminPlugin, item_displays::ScreensPlugin, map::MapPlugin, set_items::SetItemsPlugin, computer::ComputerPlugin))
+        .add_plugins((eliminator::EliminatorPlugin, admin::AdminPlugin, item_displays::ScreensPlugin, map::MapPlugin, set_items::SetItemsPlugin, computer::ComputerPlugin, muzzle::MuzzlePlugin))
         .add_systems(Update, scale_ui.run_if(in_state(Screen::InGame)))
         .add_systems(OnExit(Screen::InGame), |mut scale: ResMut<UiScale>| scale.0 = 1.0);
     }
