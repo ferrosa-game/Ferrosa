@@ -28,7 +28,8 @@ impl Plugin for NetworkPlugin {
                 (NetTick::Input, NetTick::Send, NetTick::Receive, NetTick::Events, NetTick::Follow).chain().run_if(resource_exists::<NetGame>),
             )
             .add_systems(FixedUpdate, (send_packet.in_set(NetTick::Send), receive_packets.in_set(NetTick::Receive), play_events.in_set(NetTick::Events)))
-            .add_systems(Update, start_new_round.run_if(resource_exists::<NetGame>));
+            .add_systems(Update, start_new_round.run_if(resource_exists::<NetGame>))
+            .add_systems(OnExit(Screen::InGame), |mut commands: Commands| commands.remove_resource::<NetGame>());
     }
 }
 
@@ -38,11 +39,9 @@ fn send_packet(mut net: ResMut<NetGame>, mut socket: ResMut<ClientSocket>, time:
     net.send(&mut socket, camera, time.elapsed().as_millis() as u32);
 }
 
-fn receive_packets(mut commands: Commands, mut net: ResMut<NetGame>, mut socket: ResMut<ClientSocket>, time: Res<Time<Real>>, mut next: ResMut<NextState<Screen>>) {
+fn receive_packets(mut net: ResMut<NetGame>, mut socket: ResMut<ClientSocket>, time: Res<Time<Real>>, mut next: ResMut<NextState<Screen>>) {
     if !net.receive(&mut socket, time.elapsed().as_millis() as u32) {
         warn!("the server stopped answering");
-
-        commands.remove_resource::<NetGame>();
 
         next.set(Screen::Main);
     }

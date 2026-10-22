@@ -95,3 +95,34 @@ pub(super) fn draw_particles(
         glass.write(&mut mesh);
     }
 }
+
+pub(super) fn draw_splats(mut particles: ResMut<Particles>, effect_assets: Res<EffectAssets>, mut meshes: ResMut<Assets<Mesh>>) {
+    if particles.splats_drawn == particles.splats.len() {
+        return;
+    }
+
+    let Some(mut mesh) = meshes.get_mut(&effect_assets.splats) else { return };
+    let count = particles.splats.len();
+    let (mut positions, mut normals, mut uvs, mut indices) =
+        (Vec::with_capacity(count * 4), Vec::with_capacity(count * 4), Vec::with_capacity(count * 4), Vec::with_capacity(count * 6));
+
+    for (k, s) in particles.splats.iter().enumerate() {
+        let n = s.side.cross(s.up).to_array();
+
+        for (a, b, u, v) in [(-s.size, s.size, 0.0, 1.0), (s.size, s.size, 1.0, 1.0), (s.size, -s.size, 1.0, 0.0), (-s.size, -s.size, 0.0, 0.0)] {
+            positions.push((s.pos + s.side * a + s.up * b).to_array());
+            normals.push(n);
+            uvs.push([u, v]);
+        }
+
+        let base = (k * 4) as u32;
+        indices.extend([base, base + 1, base + 2, base, base + 2, base + 3]);
+    }
+
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, vec![[1.0f32; 4]; count * 4]);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    mesh.insert_indices(Indices::U32(indices));
+    particles.splats_drawn = count;
+}

@@ -8,7 +8,7 @@ use bevy::{
     gltf::GltfAssetLabel,
     image::ImageSampler,
     light::NotShadowCaster,
-    mesh::PrimitiveTopology,
+    mesh::{Indices, PrimitiveTopology},
     prelude::*,
 };
 use ferrosa_protocol::clientbound::game::GameState;
@@ -63,10 +63,19 @@ impl Particle {
     }
 }
 
+struct Splat {
+    pos: Vec3,
+    side: Vec3,
+    up: Vec3,
+    size: f32,
+}
+
 #[derive(Resource, Default)]
 struct Particles {
     round: u32,
     list: Vec<Particle>,
+    splats: Vec<Splat>,
+    splats_drawn: usize,
     pieces: usize,
 }
 
@@ -76,6 +85,7 @@ struct EffectAssets {
     chip: (Handle<Mesh>, Handle<StandardMaterial>),
     spots: Handle<Mesh>,
     blood: Handle<Mesh>,
+    splats: Handle<Mesh>,
     glass: Handle<Mesh>,
 }
 
@@ -89,7 +99,10 @@ impl Plugin for EffectsPlugin {
                 FixedUpdate,
                 (emit_effects, simulate_particles, pieces::simulate_pieces).chain().in_set(NetTick::Follow).run_if(in_state(Screen::InGame)).run_if(resource_exists::<EffectAssets>),
             )
-            .add_systems(Update, (draw::draw_particles.after(Smoothing::Glide), pieces::place_pieces).run_if(in_state(Screen::InGame)).run_if(resource_exists::<EffectAssets>))
+            .add_systems(
+                Update,
+                (draw::draw_particles.after(Smoothing::Glide), draw::draw_splats, pieces::place_pieces).run_if(in_state(Screen::InGame)).run_if(resource_exists::<EffectAssets>),
+            )
             .add_systems(OnExit(Screen::InGame), |mut commands: Commands, mut particles: ResMut<Particles>| {
                 *particles = Particles::default();
                 commands.remove_resource::<EffectAssets>();
@@ -116,17 +129,27 @@ fn spawn_effect_assets(mut commands: Commands, assets: Res<AssetServer>, mut mes
 
     let spots = meshes.add(empty_mesh(PrimitiveTopology::TriangleList, 3));
     let blood = meshes.add(empty_mesh(PrimitiveTopology::TriangleList, 3));
+    let splats = meshes.add(empty_mesh(PrimitiveTopology::TriangleList, 3).with_inserted_indices(Indices::U32(Vec::new())));
     let glass = meshes.add(empty_mesh(PrimitiveTopology::TriangleList, 3));
     let spot_image = images.add(spot);
     let spot_material = StandardMaterial { base_color: Color::WHITE, base_color_texture: Some(spot_image.clone()), unlit: true, alpha_mode: AlphaMode::Blend, cull_mode: None, ..default() };
-    let blood_material = StandardMaterial { base_color: BLOOD_SHADE, base_color_texture: Some(spot_image), perceptual_roughness: 1.0, alpha_mode: AlphaMode::Blend, cull_mode: None, ..default() };
+    let blood_material = StandardMaterial { base_color: BLOOD_SHADE, base_color_texture: Some(spot_image.clone()), perceptual_roughness: 1.0, alpha_mode: AlphaMode::Blend, cull_mode: None, ..default() };
+    let splat_material = StandardMaterial { base_color: BLOOD_SHADE, base_color_texture: Some(spot_image), perceptual_roughness: 1.0, alpha_mode: AlphaMode::Blend, cull_mode: None, ..default() };
     let glass_material = StandardMaterial { base_color: GLASS, alpha_mode: AlphaMode::Blend, perceptual_roughness: 0.05, reflectance: 1.0, double_sided: true, cull_mode: None, ..default() };
 
     commands.spawn((Mesh3d(spots.clone()), MeshMaterial3d(materials.add(spot_material)), NoFrustumCulling, NotShadowCaster, DespawnOnExit(Screen::InGame)));
     commands.spawn((Mesh3d(blood.clone()), MeshMaterial3d(materials.add(blood_material)), NoFrustumCulling, NotShadowCaster, DespawnOnExit(Screen::InGame)));
+    commands.spawn((Mesh3d(splats.clone()), MeshMaterial3d(materials.add(splat_material)), NoFrustumCulling, NotShadowCaster, DespawnOnExit(Screen::InGame)));
     commands.spawn((Mesh3d(glass.clone()), MeshMaterial3d(materials.add(glass_material)), NoFrustumCulling, NotShadowCaster, DespawnOnExit(Screen::InGame)));
 
-    commands.insert_resource(EffectAssets { case: (primitive("models/items/case.glb"), case_material), chip: (primitive("models/items/chip.glb"), chip_material), spots, blood, glass });
+    commands.insert_resource(EffectAssets {
+        case: (primitive("models/items/case.glb"), case_material),
+        chip: (primitive("models/items/chip.glb"), chip_material),
+        spots,
+        blood,
+        splats,
+        glass,
+    });
 }
 
 fn random_vec3(scale: f32, base: f32) -> Vec3 {
@@ -276,8 +299,10 @@ fn simulate_particles(net: Res<NetGame>, level: Option<Res<Level>>, mut particle
 
     let Some(level) = level else { return };
     let map = &level.map;
+    let blood = || (rand::random::<u32>() & 0x3f) as f32 / 1024.0 + 1.0 / 16.0;
+    let Particles { list, splats, .. } = &mut *particles;
 
-    for p in &mut particles.list {
+    for p in list.iter_mut() {
         if p.kind == Kind::Smoke {
             p.vel = Vec3::new(p.vel.x, p.vel.y - p.gravity, p.vel.z) * p.drag;
 
@@ -315,6 +340,12 @@ fn simulate_particles(net: Res<NetGame>, level: Option<Res<Level>>, mut particle
             Some((at, n)) if p.kind != Kind::Shard || n.y > 0.0 => {
                 p.pos = at + n * LIFT;
                 (p.vel, p.drag, p.life) = (Vec3::ZERO, 0.0, 0);
+
+                if p.kind == Kind::Blood {
+                    let (side, up) = frame_across(n);
+
+                    splats.push(Splat { pos: p.pos, side, up, size: blood() * 0.5 });
+                }
             }
             Some((at, n)) => {
                 p.pos = at + n * LIFT;

@@ -77,7 +77,7 @@ pub struct ChatLine {
     pub life: f32,
 }
 
-#[derive(Message, Clone, Debug)]
+#[derive(Message, Clone, Debug, PartialEq)]
 pub enum NetEvent {
     Gunshot { kind: Option<ItemKind>, item: i32, bullet: i32, pos: Vec3, vel: Vec3 },
     BulletHit { hit: i32, pos: Vec3, normal: Vec3 },
