@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use ferrosa_protocol::{clientbound::{game::{GameState, ItemKind, ItemTail, MenuType, ServerGamePacket, decode::SlotChange}, initial_sync::InitialSync}, codec::{Reader, WireRead}};
 
-use crate::{game::netgame::{ADMIN_NAME, EVENTS, GAP, HUMANS, INVENTORY_SLOTS, ITEMS, LINKS, MAX_ITEM_CHILDREN, MEMO_LINE, MEMO_SIZE, NetGame, PLAYERS, SCREEN_COLUMNS, SCREEN_LINES, STALE, TIMEOUT, TRAFFIC, VEHICLES, VOICE_FRAMES, VOICE_RECEIVED, entities::Item, sync::ServerSync}, net::ClientSocket};
+use crate::{game::netgame::{ADMIN_NAME, EVENTS, GAP, HUMANS, INVENTORY_SLOTS, ITEMS, LINKS, MAX_ITEM_CHILDREN, MEMO_LINE, MEMO_SIZE, NetGame, PLAYERS, SCREEN_COLUMNS, SCREEN_LINES, STALE, TIMEOUT, TRAFFIC, VEHICLES, VOICE_FRAMES, VOICE_RECEIVED, sync::ServerSync}, net::ClientSocket};
 
 impl NetGame {
     pub fn receive(&mut self, socket: &mut ClientSocket, now: u32) -> bool {
@@ -170,11 +170,13 @@ impl NetGame {
                     index,
                 } => {
                     if let Some(it) = self.items.get_mut(index as usize) {
-                        *it = Item {
-                            active: true,
-                            kind: u8::try_from(item_type).ok().and_then(|t| ItemKind::try_from(t).ok()),
-                            ..default()
-                        };
+                        it.active = true;
+                        it.kind = u8::try_from(item_type).ok().and_then(|t| ItemKind::try_from(t).ok());
+                        it.parent_item = -1;
+                        it.parent_human = -1;
+                        it.parent_slot = 0;
+                        it.cursor = -1;
+                        it.has_history = false;
                     }
                 }
                 SlotChange::Unpack { kind: 0, index } => {
