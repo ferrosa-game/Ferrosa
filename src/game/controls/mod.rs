@@ -1,4 +1,4 @@
-use std::f64::consts::PI;
+﻿use std::f64::consts::PI;
 
 use bevy::{platform::collections::HashSet, prelude::*};
 use bevy_enhanced_input::prelude::*;
@@ -15,7 +15,7 @@ use super::{
     network::NetTick,
     vehicles::VehicleTypes,
 };
-use crate::{config::Config, menu::Screen};
+use crate::{config::{self, Config}, keys::keycode, menu::Screen};
 
 pub mod walk;
 pub mod drive;
@@ -44,6 +44,22 @@ pub enum Control {
 
 pub trait IsControl: InputAction {
     const CONTROL: Control;
+}
+
+pub mod bind {
+    pub const FORWARD: usize = 0;
+    pub const BACK: usize = 1;
+    pub const LEFT: usize = 2;
+    pub const RIGHT: usize = 3;
+    pub const JUMP: usize = 4;
+    pub const CROUCH: usize = 5;
+    pub const WALK: usize = 6;
+    pub const USE: usize = 7;
+    pub const RELOAD: usize = 8;
+    pub const SPECIAL: usize = 9;
+    pub const DELETE: usize = 10;
+    pub const RAGDOLL: usize = 11;
+    pub const AIM: usize = 12;
 }
 
 macro_rules! controls {
@@ -129,6 +145,9 @@ pub struct FlyFast;
 #[derive(InputAction)]
 #[action_output(bool)]
 pub struct FlySlow;
+
+#[derive(Resource)]
+struct BoundKeys([i32; config::BINDS.len()]);
 
 #[derive(Component, Default, Clone)]
 pub struct PlayerControls;
@@ -249,6 +268,7 @@ impl Plugin for ControlsPlugin {
             .add_systems(OnEnter(Screen::InGame), spawn_controls)
             .add_systems(OnExit(Screen::InGame), |mut input: ResMut<InputState>| *input = default())
             .add_systems(Update, switch_controls.run_if(in_state(Screen::InGame)))
+            .add_systems(Update, rebuild_controls.before(switch_controls).run_if(in_state(Screen::InGame)).run_if(resource_changed::<Config>).run_if(resource_exists::<BoundKeys>))
             .add_systems(PreUpdate, gather_movement.after(EnhancedInputSystems::Update))
             .add_systems(FixedUpdate, read_input.in_set(NetTick::Input));
 
@@ -256,36 +276,65 @@ impl Plugin for ControlsPlugin {
     }
 }
 
-fn spawn_controls(mut commands: Commands) {
+fn bound(config: &Config, bind: usize) -> KeyCode {
+    let fallback = || config::BINDS.get(bind).and_then(|&(_, key)| keycode(key)).unwrap_or(KeyCode::F24);
+
+    config.keys.get(bind).copied().and_then(keycode).unwrap_or_else(fallback)
+}
+
+fn spawn_controls(mut commands: Commands, config: Res<Config>) {
+    commands.insert_resource(BoundKeys(config.keys));
+    build_controls(&mut commands, &config);
+}
+
+fn rebuild_controls(
+    mut commands: Commands,
+    config: Res<Config>,
+    mut bound: ResMut<BoundKeys>,
+    contexts: Query<Entity, Or<(With<PlayerControls>, With<SpectatorControls>)>>,
+) {
+    if bound.0 == config.keys {
+        return;
+    }
+
+    bound.0 = config.keys;
+
+    contexts.iter().for_each(|e| commands.entity(e).try_despawn());
+    build_controls(&mut commands, &config);
+}
+
+fn build_controls(commands: &mut Commands, config: &Config) {
+    let key = |bind: usize| bound(config, bind);
+
     commands
         .spawn_scene(bsn! {
             PlayerControls
             Actions<PlayerControls> [
-                Action::<Forward>::new() Bindings [ Binding(KeyCode::KeyW) ]
+                Action::<Forward>::new() Bindings [ Binding({key(bind::FORWARD)}) ]
                 --
-                Action::<Back>::new() Bindings [ Binding(KeyCode::KeyS) ]
+                Action::<Back>::new() Bindings [ Binding({key(bind::BACK)}) ]
                 --
-                Action::<StepLeft>::new() Bindings [ Binding(KeyCode::KeyA) ]
+                Action::<StepLeft>::new() Bindings [ Binding({key(bind::LEFT)}) ]
                 --
-                Action::<StepRight>::new() Bindings [ Binding(KeyCode::KeyD) ]
+                Action::<StepRight>::new() Bindings [ Binding({key(bind::RIGHT)}) ]
                 --
-                Action::<Jump>::new() Bindings [ Binding(KeyCode::Space) ]
+                Action::<Jump>::new() Bindings [ Binding({key(bind::JUMP)}) ]
                 --
-                Action::<Crouch>::new() Bindings [ Binding(KeyCode::ControlLeft) ]
+                Action::<Crouch>::new() Bindings [ Binding({key(bind::CROUCH)}) ]
                 --
-                Action::<Shift>::new() Bindings [ Binding(KeyCode::ShiftLeft) ]
+                Action::<Shift>::new() Bindings [ Binding({key(bind::WALK)}) ]
                 --
-                Action::<Use>::new() Bindings [ Binding(KeyCode::KeyE) ]
+                Action::<Use>::new() Bindings [ Binding({key(bind::USE)}) ]
                 --
-                Action::<Reload>::new() Bindings [ Binding(KeyCode::KeyR) ]
+                Action::<Reload>::new() Bindings [ Binding({key(bind::RELOAD)}) ]
                 --
-                Action::<Special>::new() Bindings [ Binding(KeyCode::KeyF) ]
+                Action::<Special>::new() Bindings [ Binding({key(bind::SPECIAL)}) ]
                 --
-                Action::<Delete>::new() Bindings [ Binding(KeyCode::Delete) ]
+                Action::<Delete>::new() Bindings [ Binding({key(bind::DELETE)}) ]
                 --
-                Action::<Ragdoll>::new() Bindings [ Binding(KeyCode::KeyZ) ]
+                Action::<Ragdoll>::new() Bindings [ Binding({key(bind::RAGDOLL)}) ]
                 --
-                Action::<Aim>::new() Bindings [ Binding(KeyCode::KeyQ) ]
+                Action::<Aim>::new() Bindings [ Binding({key(bind::AIM)}) ]
                 --
                 Action::<Primary>::new() Bindings [ Binding(MouseButton::Left) ]
                 --
@@ -343,15 +392,15 @@ fn spawn_controls(mut commands: Commands) {
             SpectatorControls
             Actions<SpectatorControls> [
                 Action::<Fly>::new()
-                Bindings [ {preset::spatial::new(KeyCode::KeyW, KeyCode::KeyS, KeyCode::KeyA, KeyCode::KeyD, KeyCode::KeyQ, KeyCode::KeyZ)} ]
+                Bindings [ {preset::spatial::new(key(bind::FORWARD), key(bind::BACK), key(bind::LEFT), key(bind::RIGHT), KeyCode::KeyQ, KeyCode::KeyZ)} ]
                 --
                 Action::<FlyLook>::new() Bindings [ Binding::mouse_motion() ]
                 --
                 Action::<FlyZoom>::new() Bindings [ Binding::mouse_wheel() ]
                 --
-                Action::<FlyFast>::new() Bindings [ Binding(KeyCode::ShiftLeft) ]
+                Action::<FlyFast>::new() Bindings [ Binding({key(bind::WALK)}) ]
                 --
-                Action::<FlySlow>::new() Bindings [ Binding(KeyCode::ControlLeft) ]
+                Action::<FlySlow>::new() Bindings [ Binding({key(bind::CROUCH)}) ]
             ]
         })
         .insert(DespawnOnExit(Screen::InGame));
@@ -370,13 +419,13 @@ fn switch_controls(
 
     for (e, activity) in &player {
         if **activity != walking {
-            commands.entity(e).insert(ContextActivity::<PlayerControls>::new(walking));
+            commands.entity(e).try_insert(ContextActivity::<PlayerControls>::new(walking));
         }
     }
 
     for (e, activity) in &spectator {
         if **activity != (playing && !first_person.active) {
-            commands.entity(e).insert(ContextActivity::<SpectatorControls>::new(playing && !first_person.active));
+            commands.entity(e).try_insert(ContextActivity::<SpectatorControls>::new(playing && !first_person.active));
         }
     }
 }
@@ -550,3 +599,4 @@ fn stand_still(p: &mut Player) {
     p.zoom_eased = 0.0;
     p.zoom = 0.0;
 }
+

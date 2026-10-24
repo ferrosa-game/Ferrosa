@@ -30,6 +30,9 @@ pub enum GameMenu {
     Map,
 }
 
+#[derive(Component)]
+struct MenuScale;
+
 #[derive(Component, Clone, Copy)]
 enum MenuButton {
     ReturnToGame,
@@ -48,6 +51,7 @@ impl Plugin for EscapeMenuPlugin {
             .add_systems(Update, open_on_escape.run_if(|menu: Option<Res<State<GameMenu>>>| menu.is_some_and(|m| matches!(m.get(), GameMenu::Closed | GameMenu::PlayerMenu))))
             .add_systems(OnEnter(GameMenu::Open), spawn_menu)
             .add_systems(OnEnter(GameMenu::Options), spawn_options_page)
+            .add_systems(Update, scale_menu.run_if(any_with_component::<MenuScale>))
             .add_systems(OnEnter(Screen::Main), |mut commands: Commands| commands.remove_resource::<NetGame>())
             .add_observer(on_button);
     }
@@ -98,12 +102,40 @@ fn spawn_menu(mut commands: Commands, net: Option<Res<NetGame>>) {
 }
 
 fn spawn_options_page(mut commands: Commands, config: Res<Config>, devices: Res<AudioDevices>) {
+    let shade = Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), ..default() };
+
+    commands.spawn((shade, BackgroundColor(OPTIONS_SHADE), GlobalZIndex(MENU_LAYER), DespawnOnExit(GameMenu::Options)));
+
     let page = spawn_options(&mut commands, &config, &devices);
 
-    commands.entity(page).insert((BackgroundColor(OPTIONS_SHADE), GlobalZIndex(MENU_LAYER), DespawnOnExit(GameMenu::Options)));
+    let frame = Node {
+        position_type: PositionType::Absolute,
+        flex_direction: FlexDirection::Column,
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        row_gap: px(8),
+        ..default()
+    };
+
+    commands.entity(page).insert((frame, MenuScale, UiTransform::default(), GlobalZIndex(MENU_LAYER + 1), DespawnOnExit(GameMenu::Options)));
     commands.spawn((Node { height: px(24.0), ..default() }, ChildOf(page)));
 
     menu_button(&mut commands, page, "Back", MenuButton::Back, KeyCode::Escape, BACK_BUTTON);
+}
+
+fn scale_menu(scale: Res<UiScale>, mut pages: Query<(&mut Node, &mut UiTransform), With<MenuScale>>) {
+    let fit = scale.0.max(0.0625);
+    let (size, edge, want) = (percent(100.0 * fit), percent(50.0 - 50.0 * fit), Vec2::splat(1.0 / fit));
+
+    for (mut node, mut page) in &mut pages {
+        if node.width != size {
+            (node.width, node.height, node.left, node.top) = (size, size, edge, edge);
+        }
+
+        if page.scale != want {
+            page.scale = want;
+        }
+    }
 }
 
 fn on_button(

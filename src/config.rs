@@ -11,6 +11,8 @@ pub struct Config {
     pub fullscreen: i32,
     pub sound: i32,
     pub sound_volume: i32,
+    pub effects_volume: i32,
+    pub engine_volume: i32,
     pub name: String,
     pub mouse_sensitivity: i32,
     pub voice_hold_to_talk: i32,
@@ -26,7 +28,24 @@ pub struct Config {
     pub player_hair_style: i32,
     pub player_eye_color: i32,
     pub rosa_colours: i32,
+    pub keys: [i32; BINDS.len()],
 }
+
+pub const BINDS: [(&str, i32); 13] = [
+    ("forward", 26),
+    ("back", 22),
+    ("left", 4),
+    ("right", 7),
+    ("jump", 44),
+    ("crouch", 224),
+    ("walk", 225),
+    ("use", 8),
+    ("reload", 21),
+    ("special", 9),
+    ("delete", 266),
+    ("ragdoll", 29),
+    ("aim", 20),
+];
 
 impl Config {
     pub fn defaults() -> Self {
@@ -35,6 +54,8 @@ impl Config {
             fullscreen: 0,
             sound: 1,
             sound_volume: 80,
+            effects_volume: 100,
+            engine_volume: 100,
             name: format!("Agent {}", rng.random::<u32>() & 0x7fff_ffff & 0x1ff),
             mouse_sensitivity: 100,
             voice_hold_to_talk: 1,
@@ -50,6 +71,7 @@ impl Config {
             player_hair_style: rng.random_range(0..9),
             player_eye_color: rng.random_range(0..8),
             rosa_colours: 1,
+            keys: BINDS.map(|(_, key)| key),
         }
     }
 
@@ -76,10 +98,20 @@ impl Config {
         self.voice_boost.clamp(13, 400) as f32 / 100.0
     }
 
+    pub fn effects_gain(&self) -> f32 {
+        self.effects_volume.clamp(0, 200) as f32 / 100.0
+    }
+
+    pub fn engine_gain(&self) -> f32 {
+        self.engine_volume.clamp(0, 200) as f32 / 100.0
+    }
+
     fn visit(&mut self, v: &mut impl Visitor) {
         v.int("fullscreen=", &mut self.fullscreen);
         v.int("sound=", &mut self.sound);
         v.int("soundvolume=", &mut self.sound_volume);
+        v.int("effectsvolume=", &mut self.effects_volume);
+        v.int("enginevolume=", &mut self.engine_volume);
         v.string("name=", 0x1e, &mut self.name);
         v.int("mousesensitivity=", &mut self.mouse_sensitivity);
         v.int("voiceholdtotalk=", &mut self.voice_hold_to_talk);
@@ -95,6 +127,10 @@ impl Config {
         v.int("playerhairstyle=", &mut self.player_hair_style);
         v.int("playereyecolor=", &mut self.player_eye_color);
         v.int("rosacolours=", &mut self.rosa_colours);
+
+        for (bind, key) in BINDS.iter().zip(&mut self.keys) {
+            v.int(&format!("key{}=", bind.0), key);
+        }
     }
 }
 

@@ -42,6 +42,34 @@ pub fn scancode(key: KeyCode) -> Option<i32> {
         KeyCode::ControlLeft => 224,
         KeyCode::ShiftLeft => 225,
         KeyCode::AltLeft => 226,
+        KeyCode::Delete => 266,
+        _ => return None,
+    })
+}
+
+pub fn keycode(scancode: i32) -> Option<KeyCode> {
+    if let 4..=29 = scancode {
+        return LETTER_KEYS.get((scancode - 4) as usize).copied();
+    }
+
+    if let 30..=39 = scancode {
+        return DIGIT_KEYS.get(((scancode - 30) as usize + 1) % 10).copied();
+    }
+
+    Some(match scancode {
+        40 => KeyCode::Enter,
+        44 => KeyCode::Space,
+        54 => KeyCode::Comma,
+        55 => KeyCode::Period,
+        79 => KeyCode::ArrowRight,
+        80 => KeyCode::ArrowLeft,
+        81 => KeyCode::ArrowDown,
+        82 => KeyCode::ArrowUp,
+        95 => KeyCode::Numpad7,
+        224 => KeyCode::ControlLeft,
+        225 => KeyCode::ShiftLeft,
+        226 => KeyCode::AltLeft,
+        266 => KeyCode::Delete,
         _ => return None,
     })
 }

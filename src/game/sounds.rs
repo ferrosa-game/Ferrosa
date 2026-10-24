@@ -43,6 +43,8 @@ pub struct Ears {
     pub left: Vec3,
     pub right: Vec3,
     pub volume: f32,
+    pub effects: f32,
+    pub engines: f32,
 }
 
 pub struct Emitter {
@@ -178,7 +180,13 @@ fn hear(camera: Option<Single<&Transform, With<GameCamera>>>, config: Res<Config
     let ending = net.filter(|n| n.game_state == GameState::InGame).map_or(1.0, |n| (n.timer as f32 / GAME_FPS).clamp(0.0, 1.0));
     let volume = if config.sound != 0 { config.sound_volume as f32 / 100.0 * ending } else { 0.0 };
 
-    *ears = Ears { left: camera.translation - side, right: camera.translation + side, volume: volume * volume };
+    *ears = Ears {
+        left: camera.translation - side,
+        right: camera.translation + side,
+        volume: volume * volume,
+        effects: config.effects_gain(),
+        engines: config.engine_gain(),
+    };
 }
 
 fn pick(clips: &[Clip]) -> Option<&Clip> {
@@ -210,7 +218,7 @@ fn play_sounds(mut happenings: MessageReader<NetEvent>, sounds: Option<Res<GameS
         let Some(clip) = clip else { continue };
         let emitter = Emitter::new(mixer, pos, clip.radius, &ears);
 
-        emitter.player().set_volume(volume.min(1.0) * ears.volume * emitter.gain(&ears));
+        emitter.player().set_volume(volume.min(1.0) * ears.volume * ears.effects * emitter.gain(&ears));
         emitter.player().set_speed(pitch);
         emitter.player().append(clip.buffer.clone());
         playing.0.push((emitter, volume.min(1.0)));
@@ -220,7 +228,7 @@ fn play_sounds(mut happenings: MessageReader<NetEvent>, sounds: Option<Res<GameS
 fn keep_playing(ears: Res<Ears>, mut playing: ResMut<Playing>) {
     playing.0.retain(|(emitter, volume)| {
         emitter.hear(&ears);
-        emitter.player().set_volume(volume * ears.volume * emitter.gain(&ears));
+        emitter.player().set_volume(volume * ears.volume * ears.effects * emitter.gain(&ears));
         !emitter.player().empty()
     });
 }

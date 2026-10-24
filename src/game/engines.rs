@@ -59,7 +59,7 @@ fn start(speakers: &Speakers, clip: &SamplesBuffer, at: Vec3, radius: f32, ears:
     let mixer = speakers.0.as_ref()?;
     let emitter = Emitter::new(mixer, at, radius, ears);
 
-    emitter.player().set_volume(volume * ears.volume * emitter.gain(ears));
+    emitter.player().set_volume(volume * ears.volume * ears.engines * emitter.gain(ears));
     emitter.player().append(clip.clone().repeat_infinite());
 
     Some(emitter)
@@ -122,7 +122,7 @@ fn hear_engines(
 
             engine.place(front, 10.0, &ears);
             engine.player().set_speed(pitch);
-            engine.player().set_volume(s.engine_volume * ears.volume * engine.gain(&ears));
+            engine.player().set_volume(s.engine_volume * ears.volume * ears.engines * engine.gain(&ears));
         }
 
         let rear = at.translation + back * 0.125 - up * 0.25;
@@ -138,7 +138,7 @@ fn hear_engines(
             s.tire_volume += (sight(rear) * skid.min(1.0) - s.tire_volume) * 0.125;
 
             tires.place(rear, 10.0, &ears);
-            tires.player().set_volume(s.tire_volume * ears.volume * tires.gain(&ears));
+            tires.player().set_volume(s.tire_volume * ears.volume * ears.engines * tires.gain(&ears));
 
             if s.tire_volume < SKIDDING {
                 s.tires = None;

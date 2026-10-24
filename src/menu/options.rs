@@ -7,7 +7,7 @@ use bevy::{
 };
 use crate::{
     audio::AudioDevices,
-    config::{Config, config_path},
+    config::{self, Config, config_path},
     game::voice::{MicLevel, amplitude, meter},
     keys::{key_name, mouse_button_bit, scancode},
     menu::{Screen, back_button, text},
@@ -16,6 +16,7 @@ use crate::{
 
 const COLUMN_GAP: f32 = 64.0;
 const ITEM: Vec2 = Vec2::new(240.0, 32.0);
+const BIND: Vec2 = Vec2::new(144.0, 28.0);
 const HEADING: Color = Color::srgb(0.75, 0.75, 0.75);
 
 type Flag = fn(&mut Config) -> &mut i32;
@@ -23,14 +24,20 @@ type Flag = fn(&mut Config) -> &mut i32;
 #[derive(Component)]
 pub struct OptionsPage;
 
+#[derive(Clone, Copy, PartialEq)]
+enum Bind {
+    Voice,
+    Key(usize),
+}
+
 #[derive(Resource, Default)]
-struct VoiceBinding {
-    waiting: bool,
+struct Rebinding {
+    target: Option<Bind>,
     paused: Vec<Entity>,
 }
 
-#[derive(Component)]
-struct VoiceKeyButton;
+#[derive(Component, Clone, Copy)]
+struct BindButton(Bind);
 
 #[derive(Component)]
 struct VoiceMinRow;
@@ -39,11 +46,11 @@ pub(super) struct OptionsPlugin;
 
 impl Plugin for OptionsPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<VoiceBinding>()
+        app.init_resource::<Rebinding>()
             .add_systems(Startup, apply_window_settings)
             .add_systems(OnEnter(Screen::Options), options_screen)
-            .add_systems(Update, (bind_voice_key, show_voice_settings, show_voice_level).run_if(any_with_component::<OptionsPage>))
-            .add_observer(|_: On<Remove<OptionsPage>>, mut binding: ResMut<VoiceBinding>| binding.waiting = false);
+            .add_systems(Update, (bind_key, show_voice_settings, show_voice_level).run_if(any_with_component::<OptionsPage>))
+            .add_observer(|_: On<Remove<OptionsPage>>, mut binding: ResMut<Rebinding>| binding.target = None);
     }
 }
 
@@ -124,7 +131,16 @@ pub fn spawn_options(commands: &mut Commands, config: &Config, devices: &AudioDe
 
     let columns = commands.spawn((Node { column_gap: px(COLUMN_GAP), margin: UiRect::top(px(16)), ..default() }, ChildOf(p))).id();
     let column = |commands: &mut Commands| commands.spawn((Node { flex_direction: FlexDirection::Column, row_gap: px(8), ..default() }, ChildOf(columns))).id();
-    let (left, right) = (column(&mut commands), column(&mut commands));
+    let (left, right, binds) = (column(&mut commands), column(&mut commands), column(&mut commands));
+
+    heading(&mut commands, binds, "Keys");
+
+    for (i, (name, _)) in config::BINDS.iter().enumerate() {
+        let label = name[..1].to_uppercase() + &name[1..];
+
+        bind_button(&mut commands, binds, &label, Bind::Key(i));
+    }
+
 
     heading(&mut commands, left, "Display");
 
@@ -167,6 +183,26 @@ pub fn spawn_options(commands: &mut Commands, config: &Config, devices: &AudioDe
         }
     });
 
+    let effects = ui::slider::slider_int(&mut commands, right, "Effects Volume", config.effects_volume.clamp(0, 200), (0, 200), ITEM.x);
+    commands.entity(effects).observe(|v: On<ValueChange<f32>>, mut config: ResMut<Config>| {
+        let volume = v.value.round() as i32;
+
+        if config.effects_volume != volume {
+            config.effects_volume = volume;
+            save(&config);
+        }
+    });
+
+    let engines = ui::slider::slider_int(&mut commands, right, "Engine Volume", config.engine_volume.clamp(0, 200), (0, 200), ITEM.x);
+    commands.entity(engines).observe(|v: On<ValueChange<f32>>, mut config: ResMut<Config>| {
+        let volume = v.value.round() as i32;
+
+        if config.engine_volume != volume {
+            config.engine_volume = volume;
+            save(&config);
+        }
+    });
+
     let list = Vec2::new(ITEM.x, 256.0);
     let output = ui::dropdown::dropdown(&mut commands, right, "Audio Output", &devices.output, devices.chosen_output, ITEM, list);
     commands.entity(output).observe(|v: On<ValueChange<usize>>, mut devices: ResMut<AudioDevices>| devices.chosen_output = v.value);
@@ -193,53 +229,74 @@ pub fn spawn_options(commands: &mut Commands, config: &Config, devices: &AudioDe
             save(&config);
         }
     });
-    let row = commands.spawn((Node { align_items: AlignItems::Center, column_gap: px(6), ..default() }, ChildOf(right))).id();
-    let key = ui::button(&mut commands, row, "", ITEM);
-    commands.entity(key).insert(VoiceKeyButton).observe(start_binding);
-    ui::label(&mut commands, row, "Voice Key", ui::TEXT_SIZE, Color::WHITE);
+    bind_button(&mut commands, right, "Voice Key", Bind::Voice);
 
     p
 }
 
-fn start_binding(_: On<Activate>, mut binding: ResMut<VoiceBinding>, shortcuts: Query<(Entity, &Shortcut)>, mut commands: Commands) {
-    if binding.waiting {
-        return;
-    }
-    
-    binding.waiting = true;
-    binding.paused = shortcuts.iter().filter(|(_, s)| s.0 == KeyCode::Escape).map(|(e, _)| e).collect();
-    for &e in &binding.paused {
-        commands.entity(e).remove::<Shortcut>();
-    }
+fn bind_button(commands: &mut Commands, parent: Entity, label: &str, bind: Bind) {
+    let row = commands.spawn((Node { align_items: AlignItems::Center, column_gap: px(6), ..default() }, ChildOf(parent))).id();
+    let button = ui::button(commands, row, "", BIND);
+
+    commands.entity(button).insert(BindButton(bind)).observe(
+        move |_: On<Activate>, mut binding: ResMut<Rebinding>, shortcuts: Query<(Entity, &Shortcut)>, mut commands: Commands| {
+            if binding.target.is_some() {
+                return;
+            }
+
+            binding.target = Some(bind);
+            binding.paused = shortcuts.iter().filter(|(_, s)| s.0 == KeyCode::Escape).map(|(e, _)| e).collect();
+
+            for &e in &binding.paused {
+                commands.entity(e).remove::<Shortcut>();
+            }
+        },
+    );
+
+    ui::label(commands, row, label, ui::TEXT_SIZE, Color::WHITE);
 }
 
-fn bind_voice_key(
+fn bind_key(
     keys: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
-    mut binding: ResMut<VoiceBinding>,
+    mut binding: ResMut<Rebinding>,
     mut config: ResMut<Config>,
     mut commands: Commands,
 ) {
-    if !binding.waiting {
-        return;
-    }
+    let Some(target) = binding.target else { return };
 
     let key = keys.get_just_released().filter_map(|&k| scancode(k)).find(|&s| !key_name(s).is_empty());
-    if let Some(s) = key {
-        config.voice_key = s;
-    }
-
     let button = mouse.get_just_pressed().next().copied();
+    let cancel = keys.just_released(KeyCode::Escape);
 
-    if let Some(bit) = button.and_then(mouse_button_bit).filter(|&bit| bit > 2) {
-        config.voice_mb = 1 << bit;
-        config.voice_key = 0;
+    let bound = match target {
+        Bind::Voice => {
+            if let Some(s) = key {
+                config.voice_key = s;
+            }
+
+            if let Some(bit) = button.and_then(mouse_button_bit).filter(|&bit| bit > 2) {
+                config.voice_mb = 1 << bit;
+                config.voice_key = 0;
+            }
+
+            key.is_some() || button.is_some()
+        }
+        Bind::Key(i) => {
+            if let (Some(s), Some(slot)) = (key, config.keys.get_mut(i)) {
+                *slot = s;
+            }
+
+            key.is_some()
+        }
+    };
+
+    if bound {
+        save(&config);
     }
 
-    if key.is_some() || button.is_some() {
-        save(&config);
-
-        binding.waiting = false;
+    if bound || cancel {
+        binding.target = None;
 
         for e in std::mem::take(&mut binding.paused) {
             commands.entity(e).insert(Shortcut(KeyCode::Escape));
@@ -247,23 +304,36 @@ fn bind_voice_key(
     }
 }
 
-fn show_voice_settings(
-    config: Res<Config>,
-    binding: Res<VoiceBinding>,
-    buttons: Query<&Children, With<VoiceKeyButton>>,
-    mut texts: Query<&mut Text>,
-    mut rows: Query<&mut Node, With<VoiceMinRow>>,
-) {
-    let label = if binding.waiting {
-        "Press a key or mouse button".to_string()
-    } else if config.voice_key != 0 {
+fn voice_key_name(config: &Config) -> String {
+    if config.voice_key != 0 {
         key_name(config.voice_key).to_string()
     } else if config.voice_mb != 0 {
         format!("Mouse {}", config.voice_mb.trailing_zeros() + 1)
     } else {
         String::new()
-    };
-    for children in &buttons {
+    }
+}
+
+fn show_voice_settings(
+    config: Res<Config>,
+    binding: Res<Rebinding>,
+    buttons: Query<(&BindButton, &Children)>,
+    mut texts: Query<&mut Text>,
+    mut rows: Query<&mut Node, With<VoiceMinRow>>,
+) {
+    for (&BindButton(bind), children) in &buttons {
+        let label = if binding.target == Some(bind) {
+            match bind {
+                Bind::Voice => "Press a key or button".to_string(),
+                Bind::Key(_) => "Press a key".to_string(),
+            }
+        } else {
+            match bind {
+                Bind::Voice => voice_key_name(&config),
+                Bind::Key(i) => config.keys.get(i).map_or_else(String::new, |&s| key_name(s).to_string()),
+            }
+        };
+
         for &child in children {
             if let Ok(mut text) = texts.get_mut(child)
                 && text.0 != label
@@ -272,6 +342,7 @@ fn show_voice_settings(
             }
         }
     }
+
     let display = if config.voice_hold_to_talk == 0 { Display::Flex } else { Display::None };
     for mut node in &mut rows {
         if node.display != display {
