@@ -18,6 +18,7 @@ const NEAR: f32 = 1.0;
 const SHORT: f32 = 10.0;
 const FAR: f32 = 32.0;
 const GLASS_PITCH: (f32, f32) = (0.75, 0.75 + 255.0 / 512.0);
+const EAR: f32 = 0.1;
 
 #[derive(Clone)]
 struct Clip {
@@ -47,15 +48,16 @@ pub struct Ears {
 pub struct Emitter {
     player: SpatialPlayer,
     at: Vec3,
-    scale: f32,
+    radius: f32,
 }
 
 impl Emitter {
     pub fn new(mixer: &Mixer, at: Vec3, radius: f32, ears: &Ears) -> Self {
-        let scale = radius.sqrt().recip();
-        let player = SpatialPlayer::connect_new(mixer, (at * scale).into(), (ears.left * scale).into(), (ears.right * scale).into());
+        let emitter = Self { player: SpatialPlayer::connect_new(mixer, [0.0, 0.0, 1.0], [-EAR, 0.0, 0.0], [EAR, 0.0, 0.0]), at, radius };
 
-        Self { player, at, scale }
+        emitter.hear(ears);
+
+        emitter
     }
 
     pub fn player(&self) -> &SpatialPlayer {
@@ -63,14 +65,21 @@ impl Emitter {
     }
 
     pub fn place(&mut self, at: Vec3, radius: f32, ears: &Ears) {
-        (self.at, self.scale) = (at, radius.sqrt().recip());
+        (self.at, self.radius) = (at, radius);
         self.hear(ears);
     }
 
+    pub fn gain(&self, ears: &Ears) -> f32 {
+        self.radius / (self.radius + self.at.distance_squared((ears.left + ears.right) * 0.5))
+    }
+
     fn hear(&self, ears: &Ears) {
-        self.player.set_emitter_position((self.at * self.scale).into());
-        self.player.set_left_ear_position((ears.left * self.scale).into());
-        self.player.set_right_ear_position((ears.right * self.scale).into());
+        let mid = (ears.left + ears.right) * 0.5;
+        let side = (ears.right - ears.left).normalize_or(Vec3::X) * EAR;
+
+        self.player.set_emitter_position(((self.at - mid).normalize_or(Vec3::Z)).into());
+        self.player.set_left_ear_position(side.into());
+        self.player.set_right_ear_position((-side).into());
     }
 }
 
@@ -201,7 +210,7 @@ fn play_sounds(mut happenings: MessageReader<NetEvent>, sounds: Option<Res<GameS
         let Some(clip) = clip else { continue };
         let emitter = Emitter::new(mixer, pos, clip.radius, &ears);
 
-        emitter.player().set_volume(volume.min(1.0) * ears.volume);
+        emitter.player().set_volume(volume.min(1.0) * ears.volume * emitter.gain(&ears));
         emitter.player().set_speed(pitch);
         emitter.player().append(clip.buffer.clone());
         playing.0.push((emitter, volume.min(1.0)));
@@ -211,7 +220,7 @@ fn play_sounds(mut happenings: MessageReader<NetEvent>, sounds: Option<Res<GameS
 fn keep_playing(ears: Res<Ears>, mut playing: ResMut<Playing>) {
     playing.0.retain(|(emitter, volume)| {
         emitter.hear(&ears);
-        emitter.player().set_volume(volume * ears.volume);
+        emitter.player().set_volume(volume * ears.volume * emitter.gain(&ears));
         !emitter.player().empty()
     });
 }

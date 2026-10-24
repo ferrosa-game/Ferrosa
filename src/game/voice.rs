@@ -340,6 +340,6 @@ fn play_voices(
         });
 
         emitter.place(at, radius, &ears);
-        emitter.player().set_volume(channel.sight * ears.volume * config.voice_gain());
+        emitter.player().set_volume(channel.sight * ears.volume * config.voice_gain() * emitter.gain(&ears));
     }
 }
