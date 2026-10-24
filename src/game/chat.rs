@@ -348,7 +348,6 @@ fn show_bubbles(
     children.into_iter().flatten().for_each(|&c| commands.entity(c).despawn());
 
     let (camera, view) = *camera;
-    let up = view.up().as_vec3();
     let mut stacks = std::collections::HashMap::<(bool, i32), f32>::new();
 
     let own = net.me().map(|p| p.human).filter(|_| first_person.active);
@@ -365,7 +364,7 @@ fn show_bubbles(
         };
         let Some(from) = from else { continue };
 
-        let at = from + up * 0.5;
+        let at = from + Vec3::Y * 0.5;
         let size = bubble_size(line, at.distance(view.translation())).min(32.0);
 
         if size <= 4.0 {

@@ -97,22 +97,24 @@ pub(super) fn draw_particles(
 }
 
 pub(super) fn draw_splats(mut particles: ResMut<Particles>, effect_assets: Res<EffectAssets>, mut meshes: ResMut<Assets<Mesh>>) {
-    if particles.splats_drawn == particles.splats.len() {
+    if !particles.splats_dirty {
         return;
     }
 
     let Some(mut mesh) = meshes.get_mut(&effect_assets.splats) else { return };
     let count = particles.splats.len();
-    let (mut positions, mut normals, mut uvs, mut indices) =
-        (Vec::with_capacity(count * 4), Vec::with_capacity(count * 4), Vec::with_capacity(count * 4), Vec::with_capacity(count * 6));
+    let (mut positions, mut normals, mut uvs, mut colours, mut indices) =
+        (Vec::with_capacity(count * 4), Vec::with_capacity(count * 4), Vec::with_capacity(count * 4), Vec::with_capacity(count * 4), Vec::with_capacity(count * 6));
 
     for (k, s) in particles.splats.iter().enumerate() {
         let n = s.side.cross(s.up).to_array();
+        let fade = (s.life as f32 / 60.0).min(1.0);
 
         for (a, b, u, v) in [(-s.size, s.size, 0.0, 1.0), (s.size, s.size, 1.0, 1.0), (s.size, -s.size, 1.0, 0.0), (-s.size, -s.size, 0.0, 0.0)] {
             positions.push((s.pos + s.side * a + s.up * b).to_array());
             normals.push(n);
             uvs.push([u, v]);
+            colours.push([1.0, 1.0, 1.0, fade]);
         }
 
         let base = (k * 4) as u32;
@@ -121,8 +123,8 @@ pub(super) fn draw_splats(mut particles: ResMut<Particles>, effect_assets: Res<E
 
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, vec![[1.0f32; 4]; count * 4]);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colours);
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
     mesh.insert_indices(Indices::U32(indices));
-    particles.splats_drawn = count;
+    particles.splats_dirty = false;
 }

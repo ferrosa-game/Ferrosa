@@ -68,6 +68,7 @@ struct Splat {
     side: Vec3,
     up: Vec3,
     size: f32,
+    life: i32,
 }
 
 #[derive(Resource, Default)]
@@ -75,7 +76,7 @@ struct Particles {
     round: u32,
     list: Vec<Particle>,
     splats: Vec<Splat>,
-    splats_drawn: usize,
+    splats_dirty: bool,
     pieces: usize,
 }
 
@@ -300,7 +301,7 @@ fn simulate_particles(net: Res<NetGame>, level: Option<Res<Level>>, mut particle
     let Some(level) = level else { return };
     let map = &level.map;
     let blood = || (rand::random::<u32>() & 0x3f) as f32 / 1024.0 + 1.0 / 16.0;
-    let Particles { list, splats, .. } = &mut *particles;
+    let Particles { list, splats, splats_dirty, .. } = &mut *particles;
 
     for p in list.iter_mut() {
         if p.kind == Kind::Smoke {
@@ -344,7 +345,8 @@ fn simulate_particles(net: Res<NetGame>, level: Option<Res<Level>>, mut particle
                 if p.kind == Kind::Blood {
                     let (side, up) = frame_across(n);
 
-                    splats.push(Splat { pos: p.pos, side, up, size: blood() * 0.5 });
+                    splats.push(Splat { pos: p.pos, side, up, size: blood() * 0.5, life: 3600 });
+                    *splats_dirty = true;
                 }
             }
             Some((at, n)) => {
@@ -360,4 +362,20 @@ fn simulate_particles(net: Res<NetGame>, level: Option<Res<Level>>, mut particle
 
         p.life > 0
     });
+
+    let before = particles.splats.len();
+
+    particles.splats.retain_mut(|s| {
+        s.life -= 1;
+
+        s.life > 0
+    });
+
+    if particles.splats.len() > 1024 {
+        let over = particles.splats.len() - 1024;
+
+        particles.splats.drain(..over);
+    }
+
+    particles.splats_dirty |= particles.splats.len() != before || particles.splats.iter().any(|s| s.life <= 60);
 }

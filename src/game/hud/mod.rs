@@ -36,6 +36,7 @@ pub enum Stick {
     Top,
     Bottom,
     BottomLeft,
+    #[allow(dead_code)]
     BottomRight,
     TopLeft,
     TopRight,

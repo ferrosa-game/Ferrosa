@@ -12,7 +12,7 @@ use super::{
 use crate::menu::Screen;
 
 #[derive(Component)]
-struct SetItem(IVec3);
+struct SetItem(IVec3, usize);
 
 #[derive(Resource, Default)]
 struct DrawnRound(Option<u32>);
@@ -37,7 +37,7 @@ fn set_cells(level: &Level) -> Vec<IVec3> {
         .collect()
 }
 
-fn draw_cell(commands: &mut Commands, assets: &AssetServer, level: &Level, types: &ItemTypes, cell: IVec3) {
+fn draw_cell(commands: &mut Commands, assets: &AssetServer, level: &Level, types: &ItemTypes, cell: IVec3, kept: &[usize]) {
     let area = &level.map.level.area;
     let word = area.item_set(cell.x, cell.y, cell.z);
     let Some(set) = area.item_sets.set(word).filter(|_| word & 1023 != 0) else { return };
@@ -45,7 +45,7 @@ fn draw_cell(commands: &mut Commands, assets: &AssetServer, level: &Level, types
     let taken = area.taken(cell.x, cell.y, cell.z);
 
     for (i, entry) in set.entries.iter().enumerate() {
-        if taken & 1u32.wrapping_shl(i as u32) != 0 {
+        if taken & 1u32.wrapping_shl(i as u32) != 0 || kept.contains(&i) {
             continue;
         }
 
@@ -55,7 +55,7 @@ fn draw_cell(commands: &mut Commands, assets: &AssetServer, level: &Level, types
         let place = Transform::from_translation(pos + area.origin).with_rotation(Quat::from_mat3(&Mat3::from_cols(rot[0], rot[1], rot[2])));
         let model = assets.load(GltfAssetLabel::Scene(0).from_asset(format!("models/items/{}.glb", model_name(kind, &ty.name))));
 
-        let mut entity = commands.spawn((SetItem(cell), WorldAssetRoot(model), place, DespawnOnExit(Screen::InGame)));
+        let mut entity = commands.spawn((SetItem(cell, i), WorldAssetRoot(model), place, DespawnOnExit(Screen::InGame)));
 
         if let Some(kind) = u8::try_from(kind).ok().and_then(|k| ItemKind::try_from(k).ok()) {
             entity.insert(ScreenKind(kind));
@@ -85,7 +85,7 @@ fn redraw_on_new_round(
     }
 
     for &cell in &cells {
-        draw_cell(&mut commands, &assets, &level, &types, cell);
+        draw_cell(&mut commands, &assets, &level, &types, cell, &[]);
     }
 
     drawn.0 = Some(net.round);
@@ -99,27 +99,38 @@ fn apply_cell_changes(
     types: Res<ItemTypes>,
     items: Query<(Entity, &SetItem)>,
 ) {
-    let mut changed: Vec<IVec3> = Vec::new();
+    let mut changed: Vec<(IVec3, bool)> = Vec::new();
 
     for change in std::mem::take(&mut net.cell_changes) {
-        let cell = match change {
+        let (cell, replaced) = match change {
             CellChange::Taken { cell, mask } => {
                 level.map.level.area.set_taken(cell.x, cell.y, cell.z, mask);
-                cell
+                (cell, false)
             }
             CellChange::ItemSet { cell, value } => {
                 level.map.level.area.set_item_set(cell.x, cell.y, cell.z, value);
-                cell
+                (cell, true)
             }
         };
 
-        if !changed.contains(&cell) {
-            changed.push(cell);
+        match changed.iter_mut().find(|(c, _)| *c == cell) {
+            Some((_, was)) => *was |= replaced,
+            None => changed.push((cell, replaced)),
         }
     }
 
-    for cell in changed {
-        items.iter().filter(|(_, s)| s.0 == cell).for_each(|(e, _)| commands.entity(e).despawn());
-        draw_cell(&mut commands, &assets, &level, &types, cell);
+    for (cell, replaced) in changed {
+        let taken = level.map.level.area.taken(cell.x, cell.y, cell.z);
+        let mut kept: Vec<usize> = Vec::new();
+
+        for (e, item) in items.iter().filter(|(_, s)| s.0 == cell) {
+            if replaced || taken & 1u32.wrapping_shl(item.1 as u32) != 0 {
+                commands.entity(e).despawn();
+            } else {
+                kept.push(item.1);
+            }
+        }
+
+        draw_cell(&mut commands, &assets, &level, &types, cell, &kept);
     }
 }
