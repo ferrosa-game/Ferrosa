@@ -66,9 +66,15 @@ fn shadowed(s: impl Into<String>, font: &Handle<Font>, size: f32, colour: Color)
 
 fn cycle(net: &mut NetGame, back: bool) {
     let step = |i: u8| if back { i.wrapping_sub(1) } else { i.wrapping_add(1) };
-    let (start, mut i) = if net.spectating < 0 { (u8::MAX, 0) } else { (net.spectating as u8, step(net.spectating as u8)) };
+    let mut i = if net.spectating >= 0 {
+        step(net.spectating as u8)
+    } else if back {
+        u8::MAX
+    } else {
+        0
+    };
 
-    while i != start {
+    for _ in 0..=u8::MAX {
         if net.humans.get(i as usize).is_some_and(|h| h.active && h.alive) {
             net.spectating = i as i32;
             return;
@@ -78,10 +84,18 @@ fn cycle(net: &mut NetGame, back: bool) {
     }
 }
 
-fn choose_target(keys: Res<ButtonInput<KeyCode>>, menu: Res<State<GameMenu>>, fp: Res<FirstPerson>, mut net: ResMut<NetGame>, mut admin: ResMut<AdminWatching>) {
+fn choose_target(
+    keys: Res<ButtonInput<KeyCode>>,
+    mouse: Res<ButtonInput<MouseButton>>,
+    menu: Res<State<GameMenu>>,
+    fp: Res<FirstPerson>,
+    mut net: ResMut<NetGame>,
+    mut admin: ResMut<AdminWatching>,
+) {
     let listening = matches!(menu.get(), GameMenu::Closed | GameMenu::PlayerMenu);
-    let back = keys.pressed(KeyCode::ShiftLeft);
-    let (free, next) = (listening && keys.pressed(KeyCode::Digit1), listening && keys.just_pressed(KeyCode::Space));
+    let back = mouse.just_pressed(MouseButton::Right);
+    let free = listening && keys.pressed(KeyCode::Digit1);
+    let next = listening && (back || mouse.just_pressed(MouseButton::Left));
 
     if net.sync.game_type == GameMode::World {
         let Some(p) = net.me() else { return };
@@ -110,7 +124,9 @@ fn choose_target(keys: Res<ButtonInput<KeyCode>>, menu: Res<State<GameMenu>>, fp
 
     admin.0 = false;
 
-    if !spectates(net.sync.game_type) || fp.active {
+    let humanless = net.me().is_some_and(|p| p.human < 0);
+
+    if !spectates(net.sync.game_type) || fp.active || !humanless {
         return;
     }
 
@@ -135,11 +151,12 @@ fn spawn_spectator_hud(mut commands: Commands, fonts: Res<GameFonts>) {
     let (node, shift) = anchored(align::CENTRE_X, Vec2::new(512.0, 512.0));
     commands.spawn((node, shift, shadowed("Spectating", &fonts.rockwell, 16.0, white), ChildOf(bottom)));
 
-    let lines = commands.spawn((Node { position_type: PositionType::Absolute, ..default() }, WatchedLines, Pickable::IGNORE, ChildOf(bottom))).id();
+    let fill = Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), ..default() };
+    let lines = commands.spawn((fill, WatchedLines, Pickable::IGNORE, ChildOf(bottom))).id();
     let (node, shift) = anchored(align::CENTRE_X, Vec2::new(512.0, 528.0));
     commands.spawn((node, shift, WatchedName, shadowed("", &fonts.rockwell, 20.0, white), ChildOf(lines)));
     let (node, shift) = anchored(align::CENTRE_X, Vec2::new(512.0, 548.0));
-    commands.spawn((node, shift, shadowed("Press Space to switch player", &fonts.rockwell, 16.0, white), ChildOf(lines)));
+    commands.spawn((node, shift, shadowed("Click to switch player", &fonts.rockwell, 16.0, white), ChildOf(lines)));
     let (node, shift) = anchored(align::CENTRE_X, Vec2::new(512.0, 564.0));
     commands.spawn((node, shift, shadowed("Press 1 for freecam", &fonts.rockwell, 16.0, white), ChildOf(lines)));
 
@@ -175,15 +192,16 @@ fn show_spectator_hud(
 
     let target = watched(&net);
 
-    lines.set_if_neq(if target.is_some() { Visibility::Inherited } else { Visibility::Hidden });
+    lines.set_if_neq(if shown { Visibility::Inherited } else { Visibility::Hidden });
 
-    if let Some((who, team)) = target {
-        let (mut t, mut c) = name.into_inner();
+    let (mut t, mut c) = name.into_inner();
+    let who = target.as_ref().map_or("", |(w, _)| w.as_str());
 
-        if t.0 != who {
-            t.0 = who;
-        }
+    if t.0 != who {
+        t.0 = who.to_string();
+    }
 
+    if let Some((_, team)) = target {
         c.set_if_neq(TextColor(team_colour(team, 2)));
     }
 
