@@ -14,7 +14,7 @@ use crate::{
 };
 
 #[derive(Resource, Default)]
-pub struct AtComputer(pub Option<i32>);
+pub struct AtComputer(pub Option<i32>, Option<i32>);
 
 impl AtComputer {
     pub fn typing(&self) -> bool {
@@ -43,8 +43,18 @@ fn find_computer(net: Option<Res<NetGame>>, mouse: Res<ButtonInput<MouseButton>>
         (usize::try_from(item).ok().and_then(|i| net.items.get(i))?.kind == Some(ItemKind::Computer)).then_some(item)
     });
 
-    if at.0 != computer {
-        at.0 = computer;
+    if at.1.is_some() && at.1 != computer {
+        at.1 = None;
+    }
+
+    if computer.is_some() && mouse.just_pressed(MouseButton::Left) {
+        at.1 = if at.1 == computer { None } else { computer };
+    }
+
+    let typing = computer.filter(|_| at.1 != computer);
+
+    if at.0 != typing {
+        at.0 = typing;
     }
 }
 

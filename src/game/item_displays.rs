@@ -94,10 +94,14 @@ const ARCADE_GLYPHS: [[u8; 8]; 40] = [
 
 #[derive(Component)]
 struct ScreenItem {
+    kind: ItemKind,
     version: Option<u32>,
     image: Option<Handle<Image>>,
     material: Option<Handle<StandardMaterial>>,
 }
+
+#[derive(Component)]
+pub struct ScreenKind(pub ItemKind);
 
 #[derive(Component)]
 struct ScreenSlot(Handle<StandardMaterial>);
@@ -106,7 +110,7 @@ pub struct ScreensPlugin;
 
 impl Plugin for ScreensPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (add_screen_items, mark_slots, draw_screens, dress_slots).chain().run_if(in_state(Screen::InGame)).run_if(resource_exists::<NetGame>));
+        app.add_systems(Update, (add_screen_items, add_set_screens, mark_slots, draw_screens, dress_slots).chain().run_if(in_state(Screen::InGame)).run_if(resource_exists::<NetGame>));
     }
 }
 
@@ -298,7 +302,15 @@ fn arcade(item: &Item) -> Canvas {
 fn add_screen_items(mut commands: Commands, items: Query<(Entity, &NetItem), Added<NetItem>>) {
     for (e, item) in &items {
         if has_screen(item.kind) {
-            commands.entity(e).insert(ScreenItem { version: None, image: None, material: None });
+            commands.entity(e).insert(ScreenItem { kind: item.kind, version: None, image: None, material: None });
+        }
+    }
+}
+
+fn add_set_screens(mut commands: Commands, items: Query<(Entity, &ScreenKind), Added<ScreenKind>>) {
+    for (e, &ScreenKind(kind)) in &items {
+        if has_screen(kind) {
+            commands.entity(e).insert(ScreenItem { kind, version: None, image: None, material: None });
         }
     }
 }
@@ -311,17 +323,24 @@ fn mark_slots(mut commands: Commands, meshes: Query<(Entity, &GltfMaterialName, 
     }
 }
 
-fn draw_screens(net: Res<NetGame>, mut screens: Query<(&NetItem, &mut ScreenItem)>, mut images: ResMut<Assets<Image>>) {
+fn draw_screens(net: Res<NetGame>, mut screens: Query<(Option<&NetItem>, &mut ScreenItem)>, mut images: ResMut<Assets<Image>>) {
     let (Ok(fixed), Ok(rockwell)) = (FontRef::try_from_slice(FIXEDSYS), FontRef::try_from_slice(ROCKWELL)) else { return };
+    let blank = Item::default();
 
     for (net_item, mut screen) in &mut screens {
-        let Some(item) = net.items.get(net_item.index) else { continue };
+        let item = match net_item {
+            Some(ni) => match net.items.get(ni.index) {
+                Some(item) => item,
+                None => continue,
+            },
+            None => &blank,
+        };
 
         if screen.version == Some(item.text_version) {
             continue;
         }
 
-        let canvas = match net_item.kind {
+        let canvas = match screen.kind {
             ItemKind::Computer => computer(item, &fixed),
             ItemKind::Arcade => arcade(item),
             ItemKind::Paper => memo(item, &fixed),

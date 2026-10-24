@@ -1,8 +1,11 @@
 use bevy::{gltf::GltfAssetLabel, prelude::*};
 use ferrosa_world::{item_sets::entry_pose, item_types::model_name};
 
+use ferrosa_protocol::clientbound::game::ItemKind;
+
 use super::{
     Level,
+    item_displays::ScreenKind,
     items::ItemTypes,
     netgame::{CellChange, NetGame},
 };
@@ -52,7 +55,11 @@ fn draw_cell(commands: &mut Commands, assets: &AssetServer, level: &Level, types
         let place = Transform::from_translation(pos + area.origin).with_rotation(Quat::from_mat3(&Mat3::from_cols(rot[0], rot[1], rot[2])));
         let model = assets.load(GltfAssetLabel::Scene(0).from_asset(format!("models/items/{}.glb", model_name(kind, &ty.name))));
 
-        commands.spawn((SetItem(cell), WorldAssetRoot(model), place, DespawnOnExit(Screen::InGame)));
+        let mut entity = commands.spawn((SetItem(cell), WorldAssetRoot(model), place, DespawnOnExit(Screen::InGame)));
+
+        if let Some(kind) = u8::try_from(kind).ok().and_then(|k| ItemKind::try_from(k).ok()) {
+            entity.insert(ScreenKind(kind));
+        }
     }
 }
 
