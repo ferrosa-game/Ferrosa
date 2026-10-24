@@ -24,7 +24,7 @@ pub fn fly(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, set
     if input.right && !input.left {
         let slow = 1.0 - p.zoom_eased;
         p.view_yaw_delta += slow * input.dx / 650.0;
-        p.view_pitch += if settings.invert { -1.0 } else { 1.0 } * slow * input.dy / 650.0;
+        p.view_pitch += slow * input.dy / 650.0;
 
         p.view_yaw_delta = p.view_yaw_delta.clamp(-MAX_YAW as f32, MAX_YAW as f32);
         p.view_pitch = p.view_pitch.clamp(-FRAC_PI_2, FRAC_PI_2);
@@ -56,7 +56,7 @@ pub fn fly(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, set
     let keys = [(Control::Jump, flag::JUMP), (Control::Crouch, flag::CROUCH), (Control::Shift, flag::SHIFT), (Control::Use, flag::USE)];
     p.input_flags |= keys.iter().filter(|(k, _)| input.held(*k)).fold(0, |f, (_, b)| f | b);
 
-    inventory_input(net, me, human, input, settings);
+    inventory_input(net, me, human, input);
 
     let p = &mut net.players[me];
 

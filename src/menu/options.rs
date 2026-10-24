@@ -8,6 +8,7 @@ use bevy::{
 use crate::{
     audio::AudioDevices,
     config::{Config, config_path},
+    game::voice::{MicLevel, amplitude, meter},
     keys::{key_name, mouse_button_bit, scancode},
     menu::{Screen, back_button, text},
     ui::{self, Shortcut},
@@ -41,8 +42,18 @@ impl Plugin for OptionsPlugin {
         app.init_resource::<VoiceBinding>()
             .add_systems(Startup, apply_window_settings)
             .add_systems(OnEnter(Screen::Options), options_screen)
-            .add_systems(Update, (bind_voice_key, show_voice_settings).run_if(any_with_component::<OptionsPage>))
+            .add_systems(Update, (bind_voice_key, show_voice_settings, show_voice_level).run_if(any_with_component::<OptionsPage>))
             .add_observer(|_: On<Remove<OptionsPage>>, mut binding: ResMut<VoiceBinding>| binding.waiting = false);
+    }
+}
+
+fn show_voice_level(level: Res<MicLevel>, mut fills: Query<&mut Node, With<ui::slider::SliderFill>>) {
+    let width = percent(level.0 * 100.0);
+
+    for mut node in &mut fills {
+        if node.width != width {
+            node.width = width;
+        }
     }
 }
 
@@ -77,14 +88,6 @@ fn flag(commands: &mut Commands, parent: Entity, label: &str, config: &Config, s
     });
 
     checkbox
-}
-
-fn number(commands: &mut Commands, parent: Entity, label: &str, value: i32, range: (i32, i32), setting: Flag) {
-    let input = ui::field::number_input(commands, parent, label, value, range, 120.0);
-    commands.entity(input).observe(move |v: On<ValueChange<i32>>, mut config: ResMut<Config>| {
-        *setting(&mut config) = v.value;
-        save(&config);
-    });
 }
 
 fn heading(commands: &mut Commands, parent: Entity, s: &str) {
@@ -150,8 +153,6 @@ pub fn spawn_options(commands: &mut Commands, config: &Config, devices: &AudioDe
             save(&config);
         }
     });
-    flag(&mut commands, left, "Invert Mouse", config, |c| &mut c.invert_mouse);
-    flag(&mut commands, left, "Use advanced inventory", config, |c| &mut c.manual_hands);
 
     let copy = ui::button(&mut commands, left, "Copy System Info", ITEM);
     commands.entity(copy).observe(copy_system_info);
@@ -183,7 +184,15 @@ pub fn spawn_options(commands: &mut Commands, config: &Config, devices: &AudioDe
     });
     flag(&mut commands, right, "Use Push to Talk", config, |c| &mut c.voice_hold_to_talk);
     let min_row = commands.spawn((Node::default(), VoiceMinRow, ChildOf(right))).id();
-    number(&mut commands, min_row, "Voice Min", config.voice_min, (0x10, 0x4000), |c| &mut c.voice_min);
+    let min = ui::slider::slider_meter(&mut commands, min_row, "Voice Min", meter(config.voice_min) * 100.0, ITEM.x);
+    commands.entity(min).observe(|v: On<ValueChange<f32>>, mut config: ResMut<Config>| {
+        let min = amplitude(v.value / 100.0);
+
+        if config.voice_min != min {
+            config.voice_min = min;
+            save(&config);
+        }
+    });
     let row = commands.spawn((Node { align_items: AlignItems::Center, column_gap: px(6), ..default() }, ChildOf(right))).id();
     let key = ui::button(&mut commands, row, "", ITEM);
     commands.entity(key).insert(VoiceKeyButton).observe(start_binding);

@@ -12,7 +12,6 @@ pub struct Config {
     pub sound: i32,
     pub sound_volume: i32,
     pub name: String,
-    pub invert_mouse: i32,
     pub mouse_sensitivity: i32,
     pub voice_hold_to_talk: i32,
     pub voice_key: i32,
@@ -26,7 +25,6 @@ pub struct Config {
     pub player_hair_color: i32,
     pub player_hair_style: i32,
     pub player_eye_color: i32,
-    pub manual_hands: i32,
     pub rosa_colours: i32,
 }
 
@@ -38,7 +36,6 @@ impl Config {
             sound: 1,
             sound_volume: 80,
             name: format!("Agent {}", rng.random::<u32>() & 0x7fff_ffff & 0x1ff),
-            invert_mouse: 0,
             mouse_sensitivity: 100,
             voice_hold_to_talk: 1,
             voice_key: 25,
@@ -52,7 +49,6 @@ impl Config {
             player_hair_color: rng.random_range(0..12),
             player_hair_style: rng.random_range(0..9),
             player_eye_color: rng.random_range(0..8),
-            manual_hands: 0,
             rosa_colours: 1,
         }
     }
@@ -85,7 +81,6 @@ impl Config {
         v.int("sound=", &mut self.sound);
         v.int("soundvolume=", &mut self.sound_volume);
         v.string("name=", 0x1e, &mut self.name);
-        v.int("invertmouse=", &mut self.invert_mouse);
         v.int("mousesensitivity=", &mut self.mouse_sensitivity);
         v.int("voiceholdtotalk=", &mut self.voice_hold_to_talk);
         v.int("voicekey=", &mut self.voice_key);
@@ -99,7 +94,6 @@ impl Config {
         v.int("playerhaircolor=", &mut self.player_hair_color);
         v.int("playerhairstyle=", &mut self.player_hair_style);
         v.int("playereyecolor=", &mut self.player_eye_color);
-        v.int("manualhands=", &mut self.manual_hands);
         v.int("rosacolours=", &mut self.rosa_colours);
     }
 }

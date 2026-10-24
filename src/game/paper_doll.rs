@@ -3,6 +3,7 @@ use ferrosa_protocol::clientbound::game::{GameState, ItemKind};
 use ferrosa_world::skeleton::BONES;
 
 use super::{
+    GAME_SCREEN,
     hud::{self, Stick, HudScreen, in_hand, is_phone, line, own, spawn_screen},
     human_sync::NetHuman,
     netgame::NetGame,
@@ -12,7 +13,7 @@ use crate::{
     menu::Screen,
 };
 
-const AT: Vec2 = Vec2::new(512.0, 444.0);
+const AT: Vec2 = Vec2::new(76.0, GAME_SCREEN.y - 80.0);
 const PARTS: [usize; character_model::BONES] = [0, 0, 0, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5];
 
 #[derive(Component)]
@@ -31,7 +32,7 @@ impl Plugin for PaperDollPlugin {
 }
 
 fn spawn_doll(mut commands: Commands) {
-    let screen = spawn_screen(&mut commands, (HudScreen, DollScreen), Stick::Bottom);
+    let screen = spawn_screen(&mut commands, (HudScreen, DollScreen), Stick::BottomLeft);
     let doll = commands.spawn((Node { position_type: PositionType::Absolute, ..default() }, Pickable::IGNORE, ChildOf(screen))).id();
 
     for j in 0..character_model::BONES {

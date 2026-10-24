@@ -49,7 +49,7 @@ pub fn walk(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, se
     let slow = 1.0 - p.zoom_eased;
     let dx = slow * input.dx;
     let turn = dx * TURN;
-    let tilt = if settings.invert { -1.0 } else { 1.0 } * slow * input.dy * TURN;
+    let tilt = slow * input.dy * TURN;
 
     p.spin_yaw = (p.spin_yaw + turn * 0.5) * 15.0 / 16.0;
     p.view_pitch_delta = (p.view_pitch_delta + tilt * 0.5) * 15.0 / 16.0;
@@ -71,7 +71,7 @@ pub fn walk(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, se
         let behind = follow(p);
         p.view_yaw_delta = ((p.view_yaw_delta - behind) as f64 + PI).rem_euclid(TAU) as f32 - PI as f32 + dx / 2048.0;
 
-        view_pitch(p, input, settings);
+        view_pitch(p, input);
 
         if input.left {
             p.view_pitch += tilt * 0.5;
@@ -124,12 +124,12 @@ pub fn walk(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, se
         number_keys(&mut net.players[me], in_hand, input);
     }
 
-    inventory_input(net, me, human, input, settings);
+    inventory_input(net, me, human, input);
 }
 
-fn view_pitch(p: &mut Player, input: &InputState, settings: &Settings) {
+fn view_pitch(p: &mut Player, input: &InputState) {
     if !input.left {
-        p.aim_pitch[0] += if settings.invert { -1.0 } else { 1.0 } * input.dy * TURN;
+        p.aim_pitch[0] += input.dy * TURN;
     }
 
     p.aim_pitch[0] = p.aim_pitch[0].clamp(-FRAC_PI_2 as f32, FRAC_PI_2 as f32);

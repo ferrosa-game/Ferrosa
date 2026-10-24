@@ -35,6 +35,7 @@ const FIELD_HOVERED: Color = Color::srgba(0.3125, 0.3125, 0.3125, 0.5);
 const TRACK: Color = Color::srgb(0.25, 0.25, 0.25);
 const TRACK_HOVERED: Color = Color::srgb(0.375, 0.375, 0.375);
 const THUMB: Color = Color::srgb(0.5, 0.5, 0.5);
+const LEVEL: Color = Color::srgb(0.3, 0.9, 0.3);
 const CHECK_FRAME: Color = Color::srgb(0.875, 0.875, 0.875);
 const LIST: Color = Color::srgba(0.125, 0.125, 0.125, 0.85);
 const ROW_CHOSEN: Color = Color::srgba(0.75, 0.75, 0.75, 0.5);

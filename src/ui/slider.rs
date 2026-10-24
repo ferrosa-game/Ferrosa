@@ -1,6 +1,6 @@
 use bevy::{input_focus::tab_navigation::TabIndex, picking::hover::Hovered, prelude::*, ui_widgets::{Slider, SliderPrecision, SliderRange, SliderStep, SliderThumb, SliderValue, TrackClick, slider_self_update}};
 
-use crate::ui::{BAR, TEXT_SIZE, THUMB, TRACK, labelled_row, text_bundle};
+use crate::ui::{BAR, LEVEL, TEXT_SIZE, THUMB, TRACK, labelled_row, text_bundle};
 
 const CHAR_WIDTH: f32 = 0.62;
 
@@ -9,6 +9,9 @@ pub(super) struct SliderLabel {
     slider: Entity,
     label: String,
 }
+
+#[derive(Component)]
+pub struct SliderFill;
 
 pub fn slider_int(commands: &mut Commands, parent: Entity, label: &str, value: i32, (min, max): (i32, i32), width: f32) -> Entity {
     let row = labelled_row(commands, parent);
@@ -37,6 +40,32 @@ pub fn slider_int(commands: &mut Commands, parent: Entity, label: &str, value: i
         SliderLabel { slider, label: label.to_string() },
         ChildOf(row),
     ));
+
+    slider
+}
+
+pub fn slider_meter(commands: &mut Commands, parent: Entity, label: &str, value: f32, width: f32) -> Entity {
+    let row = labelled_row(commands, parent);
+
+    let slider = commands
+        .spawn((
+            Node { width: px(width), height: px(24), ..default() },
+            BackgroundColor(TRACK),
+            Slider { track_click: TrackClick::Snap, ..default() },
+            SliderValue(value),
+            SliderRange::new(0.0, 100.0),
+            SliderStep(1.0),
+            SliderPrecision(0),
+            TabIndex(0),
+            Hovered::default(),
+            ChildOf(row),
+        ))
+        .observe(slider_self_update)
+        .id();
+
+    commands.spawn((Node { position_type: PositionType::Absolute, width: percent(0), height: percent(100), ..default() }, BackgroundColor(LEVEL), SliderFill, ChildOf(slider)));
+    commands.spawn((Node { position_type: PositionType::Absolute, width: px(BAR), height: percent(100), ..default() }, BackgroundColor(THUMB), SliderThumb, ChildOf(slider)));
+    commands.spawn((text_bundle(label, TEXT_SIZE, Color::WHITE), ChildOf(row)));
 
     slider
 }

@@ -43,7 +43,7 @@ const THRESHOLD: Color = Color::srgba(1.0, 1.0, 1.0, 0.8);
 const MIC: Color = Color::WHITE;
 
 #[derive(Resource, Default)]
-struct MicLevel(f32);
+pub struct MicLevel(pub f32);
 
 #[derive(Component)]
 struct MeterScreen;
@@ -147,6 +147,7 @@ impl Plugin for VoicePlugin {
             .add_systems(OnEnter(Screen::InGame), spawn_meter)
             .add_systems(Update, show_meter.run_if(in_state(Screen::InGame)).run_if(resource_exists::<NetGame>))
             .add_systems(FixedUpdate, record.in_set(NetTick::Input))
+            .add_systems(Update, monitor_mic.run_if(not(in_state(Screen::InGame))))
             .add_systems(Update, play_voices.after(Smoothing::View).run_if(in_state(Screen::InGame)).run_if(resource_exists::<NetGame>))
             .add_systems(OnExit(Screen::InGame), |voices: Res<Voices>| voices.0.lock().map(|mut v| v.iter_mut().for_each(|c| *c = Channel::default())).unwrap_or_default());
     }
@@ -205,10 +206,23 @@ fn record(
     }
 }
 
-fn meter(amplitude: i32) -> f32 {
+pub fn meter(amplitude: i32) -> f32 {
     let ratio = amplitude.max(1) as f32 / 32768.0;
 
     ((20.0 * ratio.log10() - QUIETEST_DB) / -QUIETEST_DB).clamp(0.0, 1.0)
+}
+
+pub fn amplitude(level: f32) -> i32 {
+    let db = QUIETEST_DB * (1.0 - level.clamp(0.0, 1.0));
+
+    ((10.0_f32.powf(db / 20.0) * 32768.0).round() as i32).clamp(0x10, 0x4000)
+}
+
+fn monitor_mic(samples: Res<MicSamples>, mut level: ResMut<MicLevel>) {
+    let Ok(captured) = samples.0.lock() else { return };
+    let peak = captured.iter().rev().take(FRAME).map(|&s| (s as i32).abs()).max().unwrap_or(0);
+
+    level.0 = (level.0 * 0.85).max(meter(peak));
 }
 
 fn spawn_meter(mut commands: Commands) {

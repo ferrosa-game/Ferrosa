@@ -7,8 +7,6 @@ use crate::{
     game::{GAME_FPS, escape_menu::OVERLAY_LAYER, netgame::NetGame},
 };
 
-const TIMER_AT: Vec2 = Vec2::new(1020.0, 4.0);
-
 #[derive(Component)]
 pub(super) struct TimerScreen;
 
@@ -19,7 +17,7 @@ pub(super) fn spawn(commands: &mut Commands, fonts: &GameFonts) {
     let top_right = spawn_screen(commands, TimerScreen, Stick::TopRight);
     commands.entity(top_right).insert(GlobalZIndex(OVERLAY_LAYER));
 
-    let (node, shift) = anchored(align::RIGHT, TIMER_AT);
+    let (node, shift) = anchored(align::RIGHT, Vec2::new(1020.0, 4.0));
     commands.spawn((node, shift, RoundTimer, text("", &fonts.osd_white, 24.0, Color::WHITE), ChildOf(top_right)));
 }
 

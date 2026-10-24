@@ -168,12 +168,10 @@ fn fly_spectator(
         spectator.pos += Vec3::new(-back * sin + across * cos, up, across * sin + back * cos) * speed * frames;
     }
 
-    let invert = if config.invert_mouse != 0 { -1.0 } else { 1.0 };
-
     let turn = (1.0 / 320.0) * config.sensitivity();
 
     spectator.yaw += look.x * turn;
-    spectator.pitch = (spectator.pitch + invert * look.y * turn).clamp(-FRAC_PI_2, FRAC_PI_2);
+    spectator.pitch = (spectator.pitch + look.y * turn).clamp(-FRAC_PI_2, FRAC_PI_2);
 
     spectator.zoom_target = (spectator.zoom_target - zoom.y).clamp(2.0, 32.0);
     spectator.zoom += (spectator.zoom_target - spectator.zoom) * (1.0 - (1.0 - 0.0625_f32).powf(frames));

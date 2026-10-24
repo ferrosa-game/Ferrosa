@@ -36,6 +36,7 @@ pub enum Stick {
     Top,
     Bottom,
     BottomLeft,
+    BottomRight,
     TopLeft,
     TopRight,
 }
@@ -137,6 +138,7 @@ pub fn spawn_screen(commands: &mut Commands, marker: impl Bundle, stick: Stick) 
         Stick::Centre => (JustifyContent::Center, AlignItems::Center),
         Stick::Bottom => (JustifyContent::Center, AlignItems::FlexEnd),
         Stick::BottomLeft => (JustifyContent::FlexStart, AlignItems::FlexEnd),
+        Stick::BottomRight => (JustifyContent::FlexEnd, AlignItems::FlexEnd),
         Stick::TopLeft => (JustifyContent::FlexStart, AlignItems::FlexStart),
         Stick::Top => (JustifyContent::Center, AlignItems::FlexStart),
         Stick::TopRight => (JustifyContent::FlexEnd, AlignItems::FlexStart),

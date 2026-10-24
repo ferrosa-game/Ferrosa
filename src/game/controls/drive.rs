@@ -37,7 +37,7 @@ pub fn drive(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, s
     } else {
         let slow = 1.0 - p.zoom_eased;
         p.view_yaw_delta += slow * input.dx * TURN;
-        p.view_pitch += if settings.invert { -1.0 } else { 1.0 } * slow * input.dy * TURN;
+        p.view_pitch += slow * input.dy * TURN;
         p.gear_x = if p.gear_x < 0.5 { 0.0 } else if p.gear_x >= 1.5 { 2.0 } else { 1.0 };
         p.gear_y = if p.gear_y < -0.375 { -1.0 } else if p.gear_y <= 0.375 { 0.0 } else { 1.0 };
     }
@@ -75,7 +75,7 @@ pub fn drive(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, s
         number_keys(&mut net.players[me], held, input);
     }
 
-    inventory_input(net, me, human, input, settings);
+    inventory_input(net, me, human, input);
 
     let p = &mut net.players[me];
     p.forward_back = p.forward_back.clamp(-1.0, 1.0);

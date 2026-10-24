@@ -235,8 +235,6 @@ impl InputState {
 }
 
 pub struct Settings {
-    invert: bool,
-    manual_hands: bool,
     paused: bool,
 }
 
@@ -448,9 +446,9 @@ fn scroll_actions(net: &mut NetGame, me: usize, item: i32, input: &mut InputStat
     }
 }
 
-fn inventory_input(net: &mut NetGame, me: usize, human: i32, input: &mut InputState, settings: &Settings) {
+fn inventory_input(net: &mut NetGame, me: usize, human: i32, input: &mut InputState) {
     let shift = input.held(Control::Shift);
-    let hand = if settings.manual_hands { shift as u32 } else if shift { 2 } else { 3 };
+    let hand = if shift { 2 } else { 3 };
     let dialling = dialling(net, slot_item(net, human, 0));
     let p = &mut net.players[me];
 
@@ -505,8 +503,6 @@ fn read_input(
     (input.dx, input.dy) = (input.dx * sensitivity, input.dy * sensitivity);
 
     let settings = Settings {
-        invert: config.invert_mouse != 0,
-        manual_hands: config.manual_hands != 0,
         paused: menu.is_some_and(|m| *m.get() != GameMenu::Closed),
     };
 

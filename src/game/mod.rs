@@ -39,7 +39,7 @@ mod sounds;
 mod terrain;
 mod textures;
 mod vehicles;
-mod voice;
+pub mod voice;
 
 use bevy::prelude::*;
 use ferrosa_world::map::Map;
