@@ -3,7 +3,7 @@ use ferrosa_protocol::clientbound::game::ItemKind;
 
 use super::{
     controls::{Control, InputState},
-    hud::{self, Stick, HudScreen, align, anchored, in_hand, is_phone, own, rect, spawn_screen, text},
+    hud::{self, Stick, HudScreen, align, anchored, in_hand, is_phone, own, rect, set_text, shown, spawn_screen, text},
     items::ItemTypes,
     netgame::{INVENTORY_SLOTS, NetGame},
 };
@@ -38,6 +38,7 @@ const ICONS: [(ItemKind, &str); 26] = [
     (ItemKind::Grenade, "icon-grenade"),
 ];
 const BOX: Vec2 = Vec2::new(128.0, 32.0);
+const CELLS: usize = 2;
 const SWAPPING_HANDS: i32 = 1;
 const POCKETING: i32 = 2;
 
@@ -48,22 +49,25 @@ struct ItemIcons{
 }
 
 impl ItemIcons {
-    fn of(&self, kind: Option<ItemKind>) -> Option<Handle<Image>> {
-        kind.and_then(|k| self.icons.get(&k)).or(Some(&self.not_found)).cloned()
+    fn of(&self, kind: Option<ItemKind>) -> Handle<Image> {
+        kind.and_then(|k| self.icons.get(&k)).unwrap_or(&self.not_found).clone()
     }
 }
 
-#[derive(Clone, PartialEq, Default)]
-struct View {
-    slots: Vec<Vec<(Option<ItemKind>, i32)>>,
-    selected: Option<usize>,
-}
-
-#[derive(Component)]
-struct InventoryPanel;
-
 #[derive(Component)]
 struct InventoryScreen;
+
+#[derive(Component)]
+struct SlotFrame(usize);
+
+#[derive(Component)]
+struct SlotLabel(usize);
+
+#[derive(Component)]
+struct Cell(usize, usize);
+
+#[derive(Component)]
+struct CellNote(usize, usize);
 
 #[derive(Component)]
 struct Flying;
@@ -89,109 +93,165 @@ fn load_icons(mut commands: Commands, assets: Res<AssetServer>) {
 
 fn slot_at(slot: usize) -> Vec2 {
     match slot {
-        0 => Vec2::new(608.0, 492.0),
-        1 => Vec2::new(416.0, 492.0),
-        _ => Vec2::new((slot - 2) as f32 * 140.0 + 212.0, 544.0),
+        0 => Vec2::new(616.0, 492.0),
+        1 => Vec2::new(424.0, 492.0),
+        _ => Vec2::new((slot - 2) as f32 * 140.0 + 220.0, 544.0),
     }
+}
+
+fn cell_at(slot: usize, row: usize) -> Vec2 {
+    slot_at(slot) + if slot < 2 { Vec2::ZERO } else { Vec2::Y * 32.0 * row as f32 }
 }
 
 fn entry(code: i32) -> (Option<ItemKind>, i32) {
     (ItemKind::try_from((code & 0xff) as u8).ok(), code >> 8)
 }
 
-fn spawn_inventory(mut commands: Commands) {
+fn item_name(types: &ItemTypes, kind: Option<ItemKind>) -> Option<String> {
+    let name = &types.0.get(kind? as usize)?.name;
+
+    (!name.is_empty()).then(|| name.clone())
+}
+
+fn spawn_inventory(mut commands: Commands, fonts: Res<GameFonts>) {
     let screen = spawn_screen(&mut commands, (HudScreen, InventoryScreen), Stick::Bottom);
+    let frame = |at: Vec2, border: UiRect| {
+        (Node { border, ..rect(align::BOTTOM_CENTRE, at, BOX) }, BackgroundColor(hud::colour([0.0, 0.0, 0.0, 0.25])), BorderColor::all(Color::WHITE), Pickable::IGNORE)
+    };
+
+    for slot in 0..INVENTORY_SLOTS {
+        let at = slot_at(slot);
+
+        if slot < 2 {
+            commands.spawn((frame(at, UiRect::all(px(1.0))), SlotFrame(slot), ChildOf(screen)));
+        } else {
+            for row in 0..CELLS {
+                let border = if row == 0 { UiRect { bottom: px(0.0), ..UiRect::all(px(1.0)) } } else { UiRect { top: px(0.0), ..UiRect::all(px(1.0)) } };
+
+                commands.spawn((frame(cell_at(slot, row), border), SlotFrame(slot), ChildOf(screen)));
+            }
+        }
+
+        let (node, shift) = anchored(align::BOTTOM_CENTRE, Vec2::new(at.x, at.y - if slot < 2 { BOX.y + 2.0 } else { 32.0 }));
+        commands.spawn((node, shift, SlotLabel(slot), text("", &fonts.osd_white, 12.0, Color::WHITE), ChildOf(screen)));
+
+        for row in 0..CELLS {
+            let cell = cell_at(slot, row);
+
+            commands.spawn((rect(align::BOTTOM_CENTRE, cell, BOX), UiTransform::default(), ImageNode::default(), Cell(slot, row), Visibility::Hidden, Pickable::IGNORE, ChildOf(screen)));
+
+            if slot < 2 {
+                let (node, shift) = anchored(align::BOTTOM, cell);
+
+                commands.spawn((node, shift, CellNote(slot, row), text("", &fonts.osd_white, 8.0, Color::WHITE), ChildOf(screen)));
+            }
+        }
+    }
 
     commands.spawn((rect(align::BOTTOM_CENTRE, Vec2::ZERO, BOX), ImageNode::default(), Flying, Visibility::Hidden, Pickable::IGNORE, ChildOf(screen)));
 }
 
 fn show_inventory(
-    mut commands: Commands,
     net: Res<NetGame>,
     input: Res<InputState>,
     types: Res<ItemTypes>,
     icons: Res<ItemIcons>,
-    fonts: Res<GameFonts>,
-    screen: Single<Entity, With<InventoryScreen>>,
-    panels: Query<Entity, With<InventoryPanel>>,
-    mut last: Local<Option<View>>,
+    mut parts: ParamSet<(
+        Query<(&Cell, &mut ImageNode, &mut UiTransform, &mut Visibility)>,
+        Query<(&CellNote, &mut Node, &mut Text, &mut Visibility)>,
+        Query<(&SlotLabel, &mut Text, &mut TextColor, &mut Visibility)>,
+        Query<(&SlotFrame, &mut BorderColor)>,
+    )>,
 ) {
-    let view = own(&net).map(|(p, h, _)| {
-        let dialling = in_hand(&net, h, 0).is_some_and(|(item, kind)| is_phone(kind) && net.items[item].phone.0 == 1);
-        let selected = (2..INVENTORY_SLOTS).find(|&slot| !dialling && input.holding(Control::Row((slot - 1) as u8)));
+    let Some((p, h, _)) = own(&net) else { return };
 
-        View { slots: p.display_inventory.iter().map(|s| s.iter().map(|&c| entry(c)).collect()).collect(), selected }
-    });
+    let dialling = in_hand(&net, h, 0).is_some_and(|(item, kind)| is_phone(kind) && net.items[item].phone.0 == 1);
+    let selected = (2..INVENTORY_SLOTS).find(|&slot| !dialling && input.holding(Control::Row((slot - 1) as u8)));
+    let holding = p.display_inventory[..2].iter().find(|s| !s.is_empty()).and_then(|s| s.first().map(|&c| entry(c).0));
 
-    if view == *last {
-        return;
-    }
+    let fits = |slot: usize| match holding {
+        Some(kind) => {
+            let fits = kind.and_then(|k| types.0.get(k as usize)).is_some_and(|t| t.pockets.get(slot - 2).is_some_and(|&p| p != 0));
 
-    panels.iter().for_each(|e| commands.entity(e).despawn());
-
-    if let Some(view) = &view {
-        let panel = commands.spawn((Node { position_type: PositionType::Absolute, ..default() }, InventoryPanel, Pickable::IGNORE, ChildOf(*screen))).id();
-        spawn_slots(&mut commands, panel, view, &types, &icons, &fonts);
-    }
-
-    *last = view;
-}
-
-fn spawn_slots(commands: &mut Commands, panel: Entity, view: &View, types: &ItemTypes, icons: &ItemIcons, fonts: &GameFonts) {
-    let shade = BackgroundColor(hud::colour([0.0, 0.0, 0.0, 0.25]));
-    let frame = |at: Vec2, border: UiRect| (Node { border, ..rect(align::BOTTOM_CENTRE, at, BOX) }, shade, BorderColor::all(Color::WHITE));
-    let small = |s: String, at: Vec2, size: f32| {
-        let (node, shift) = anchored(align::BOTTOM, at);
-        (node, shift, text(s, &fonts.osd_white, size, Color::WHITE))
+            fits && p.display_inventory[slot].len() < CELLS
+        }
+        None => true,
     };
 
-    let icon = |kind: Option<ItemKind>, at: Vec2, scale: f32, tint: Color| {
-        let image = icons.of(kind)?;
-        Some((rect(align::BOTTOM_CENTRE, at, BOX * scale), ImageNode::new(image).with_color(tint), Pickable::IGNORE))
-    };
+    for (&Cell(slot, row), mut image, mut transform, mut v) in &mut parts.p0() {
+        let Some((kind, count)) = p.display_inventory[slot].get(row).map(|&c| entry(c)) else {
+            shown(&mut v, false);
+            continue;
+        };
 
-    for (slot, items) in view.slots.iter().enumerate().take(2) {
-        let at = slot_at(slot);
+        let pin_pulled = count == 0 && kind == Some(ItemKind::Grenade);
+        let picked = row == 0 && selected == Some(slot);
+        let icon = icons.of(kind);
+        let tint = if pin_pulled {
+            Color::srgb(1.0, 0.0, 0.0)
+        } else if picked {
+            Color::srgb(0.0, 1.0, 0.0)
+        } else {
+            Color::WHITE
+        };
+        let scale = Vec2::splat(if picked { 1.125 } else { 1.0 });
 
-        commands.spawn((frame(at + Vec2::X * 8.0, UiRect::all(px(1.0))), ChildOf(panel)));
+        shown(&mut v, true);
 
-        for &(kind, count) in items {
-            let pin_pulled = count == 0 && kind == Some(ItemKind::Grenade);
+        if image.image != icon {
+            image.image = icon;
+        }
 
-            if let Some(bundle) = icon(kind, at + Vec2::X * 8.0, 1.0, if pin_pulled { Color::srgb(1.0, 0.0, 0.0) } else { Color::WHITE }) {
-                commands.spawn((bundle, ChildOf(panel)));
-            }
+        if image.color != tint {
+            image.color = tint;
+        }
 
+        if transform.scale != scale {
+            transform.scale = scale;
+        }
+    }
+
+    for (&CellNote(slot, row), mut node, mut t, mut v) in &mut parts.p1() {
+        let note = p.display_inventory[slot].get(row).map(|&c| entry(c)).and_then(|(kind, count)| {
             let rounds = kind.and_then(|k| types.0.get(k as usize)).is_some_and(|t| t.magazine_ammo > 0);
 
             if rounds {
-                commands.spawn((small(count.to_string(), at + Vec2::X * 16.0, 8.0), ChildOf(panel)));
+                Some((count.to_string(), 8.0))
             } else if count > 0 && kind != Some(ItemKind::BriefcaseOpen) {
-                let note = if count == 1 { "+magazine" } else { "+empty magazine" };
-
-                commands.spawn((small(note.to_string(), at + Vec2::X * 8.0, 8.0), ChildOf(panel)));
+                Some((if count == 1 { "+magazine" } else { "+empty magazine" }.to_string(), 0.0))
+            } else {
+                None
             }
+        });
+        let left = px(cell_at(slot, row).x + note.as_ref().map_or(0.0, |&(_, shift)| shift));
+
+        if node.left != left {
+            node.left = left;
         }
+
+        set_text(&mut t, &mut v, note.map(|(note, _)| note));
     }
 
-    for (slot, items) in view.slots.iter().enumerate().skip(2) {
-        let at = slot_at(slot);
+    for (&SlotLabel(slot), mut t, mut colour, mut v) in &mut parts.p2() {
+        let name = item_name(&types, p.display_inventory[slot].first().map(|&c| entry(c)).and_then(|(kind, _)| kind));
+        let label = match slot {
+            0 | 1 => name,
+            _ => name.filter(|_| selected == Some(slot)).or(Some((slot - 1).to_string())),
+        };
+        let faded = hud::colour([1.0, 1.0, 1.0, if slot >= 2 && !fits(slot) { 0.25 } else { 1.0 }]);
 
-        for row in 0..2 {
-            let border = if row == 0 { UiRect { bottom: px(0.0), ..UiRect::all(px(1.0)) } } else { UiRect { top: px(0.0), ..UiRect::all(px(1.0)) } };
-
-            commands.spawn((frame(at + Vec2::new(8.0, 32.0 * row as f32), border), ChildOf(panel)));
+        if colour.0 != faded {
+            colour.0 = faded;
         }
 
-        commands.spawn((small((slot - 1).to_string(), at - Vec2::Y * 32.0, 12.0), ChildOf(panel)));
+        set_text(&mut t, &mut v, label);
+    }
 
-        for (row, &(kind, _)) in items.iter().enumerate() {
-            let selected = row == 0 && view.selected == Some(slot);
-            let (scale, tint) = if selected { (1.125, Color::srgb(0.0, 1.0, 0.0)) } else { (1.0, Color::WHITE) };
+    for (&SlotFrame(slot), mut edge) in &mut parts.p3() {
+        let faded = hud::colour([1.0, 1.0, 1.0, if slot >= 2 && !fits(slot) { 0.25 } else { 1.0 }]);
 
-            if let Some(bundle) = icon(kind, at + Vec2::new(8.0, 32.0 * row as f32), scale, tint) {
-                commands.spawn((bundle, ChildOf(panel)));
-            }
+        if edge.top != faded {
+            *edge = BorderColor::all(faded);
         }
     }
 }
@@ -213,7 +273,7 @@ fn fly_item(net: Res<NetGame>, icons: Res<ItemIcons>, flying: Single<(&mut Node,
         let to = to.min(INVENTORY_SLOTS - 1);
         let t = own.action_duration as f32 / 100.0;
 
-        Some((icons.of(kind)?, slot_at(from).lerp(slot_at(to), t)))
+        Some((icons.of(kind), slot_at(from).lerp(slot_at(to), t)))
     });
 
     let Some((icon, at)) = route else {

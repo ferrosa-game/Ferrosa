@@ -105,10 +105,12 @@ impl Plugin for GamePlugin {
     }
 }
 
-fn scale_ui(window: Single<&Window>, mut scale: ResMut<UiScale>) {
+fn scale_ui(window: Single<&Window>, menu: Option<Res<State<escape_menu::GameMenu>>>, mut scale: ResMut<UiScale>) {
     let fit = (window.width() / GAME_SCREEN.x).min(window.height() / GAME_SCREEN.y);
+    let options = menu.is_some_and(|m| *m == escape_menu::GameMenu::Options);
+    let want = if options { 1.0 } else { fit };
 
-    if scale.0 != fit {
-        scale.0 = fit;
+    if scale.0 != want {
+        scale.0 = want;
     }
 }

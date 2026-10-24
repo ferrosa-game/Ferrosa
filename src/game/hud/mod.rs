@@ -150,11 +150,11 @@ pub fn spawn_screen(commands: &mut Commands, marker: impl Bundle, stick: Stick) 
     commands.spawn((screen, marker, Pickable::IGNORE, Visibility::Hidden, ChildOf(window))).id()
 }
 
-fn shown(visibility: &mut Mut<Visibility>, show: bool) {
+pub fn shown(visibility: &mut Mut<Visibility>, show: bool) {
     visibility.set_if_neq(if show { Visibility::Inherited } else { Visibility::Hidden });
 }
 
-fn set_text(t: &mut Text, v: &mut Mut<Visibility>, s: Option<String>) {
+pub fn set_text(t: &mut Text, v: &mut Mut<Visibility>, s: Option<String>) {
     shown(v, s.is_some());
 
     if let Some(s) = s
