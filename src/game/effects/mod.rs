@@ -59,7 +59,7 @@ struct Particle {
 
 impl Particle {
     fn new(kind: Kind, pos: Vec3, vel: Vec3) -> Self {
-        Self { kind, life: 65535, gravity: GRAVITY, drag:0.9975, size: 0.0, pos, vel, frame: [Vec3::ZERO; 3], corner_vel: [Vec3::ZERO; 3], rest: [0.0; 3], spin_axis: Vec3::ZERO, spin: 0.0 }
+        Self { kind, life: 3600, gravity: GRAVITY, drag:0.9975, size: 0.0, pos, vel, frame: [Vec3::ZERO; 3], corner_vel: [Vec3::ZERO; 3], rest: [0.0; 3], spin_axis: Vec3::ZERO, spin: 0.0 }
     }
 }
 
@@ -356,9 +356,7 @@ fn simulate_particles(net: Res<NetGame>, level: Option<Res<Level>>, mut particle
     }
 
     particles.list.retain_mut(|p| {
-        if p.life < 65535 {
-            p.life -= 1;
-        }
+        p.life -= 1;
 
         p.life > 0
     });

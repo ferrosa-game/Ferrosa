@@ -58,7 +58,7 @@ pub(super) fn break_pane(particles: &mut Particles, level: &mut Level, cell: IVe
 
             t.frame = [c[k], c[(k + 1) & 3], tip];
             t.corner_vel = [Vec3::ZERO, Vec3::ZERO, hit_vel / 64.0];
-            t.life = 60000;
+            t.life = 3600;
             t.rest = [t.frame[0].distance(t.frame[1]), t.frame[1].distance(t.frame[2]), t.frame[2].distance(t.frame[0])];
             particles.list.push(t);
         }
@@ -71,7 +71,7 @@ pub(super) fn break_pane(particles: &mut Particles, level: &mut Level, cell: IVe
 }
 
 pub(super) fn settle(p: &mut Particle, map: &Map) {
-    if p.life <= 59400 {
+    if p.life <= 3600 - 600 {
         return;
     }
 

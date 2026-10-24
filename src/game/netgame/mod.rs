@@ -40,6 +40,7 @@ const MAX_ITEM_CHILDREN: usize = 8;
 const BONES: usize = 0xf;
 const TIMEOUT: u32 = 0x707;
 const STALE: i32 = 0x270f;
+const GAP: u32 = 250;
 const CHAT_LINES: usize = 0x40;
 const CHAT_LENGTH: usize = 0x7f;
 const LONG_CHAT: f32 = 10.0;
@@ -134,6 +135,8 @@ pub struct NetGame {
     pub game_state: GameState,
     pub share_prices: [i32; 6],
     pub silence: u32,
+    pub dropped: u32,
+    pub last_applied: u32,
     pub tick: i32,
     pub timer: u32,
     pub timer_extra: u32,
@@ -190,6 +193,8 @@ impl NetGame {
             game_state: GameState::default(),
             share_prices: [0; 6],
             silence: 0,
+            dropped: 0,
+            last_applied: 0,
             tick: 0,
             timer: 0,
             timer_extra: 0,

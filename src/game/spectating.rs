@@ -148,16 +148,16 @@ fn spawn_spectator_hud(mut commands: Commands, fonts: Res<GameFonts>) {
     let right = spawn_screen(&mut commands, SpectatorScreen, Stick::TopRight);
     let white = Color::WHITE;
 
-    let (node, shift) = anchored(align::CENTRE_X, Vec2::new(512.0, 512.0));
+    let (node, shift) = anchored(align::CENTRE_X, Vec2::new(512.0, 480.0));
     commands.spawn((node, shift, shadowed("Spectating", &fonts.rockwell, 16.0, white), ChildOf(bottom)));
 
     let fill = Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), ..default() };
     let lines = commands.spawn((fill, WatchedLines, Pickable::IGNORE, ChildOf(bottom))).id();
-    let (node, shift) = anchored(align::CENTRE_X, Vec2::new(512.0, 528.0));
+    let (node, shift) = anchored(align::CENTRE_X, Vec2::new(512.0, 496.0));
     commands.spawn((node, shift, WatchedName, shadowed("", &fonts.rockwell, 20.0, white), ChildOf(lines)));
-    let (node, shift) = anchored(align::CENTRE_X, Vec2::new(512.0, 548.0));
+    let (node, shift) = anchored(align::CENTRE_X, Vec2::new(512.0, 516.0));
     commands.spawn((node, shift, shadowed("Click to switch player", &fonts.rockwell, 16.0, white), ChildOf(lines)));
-    let (node, shift) = anchored(align::CENTRE_X, Vec2::new(512.0, 564.0));
+    let (node, shift) = anchored(align::CENTRE_X, Vec2::new(512.0, 532.0));
     commands.spawn((node, shift, shadowed("Press 1 for freecam", &fonts.rockwell, 16.0, white), ChildOf(lines)));
 
     let list = Node { position_type: PositionType::Absolute, left: px(LIST_AT.x), top: px(LIST_AT.y), flex_direction: FlexDirection::Column, ..default() };

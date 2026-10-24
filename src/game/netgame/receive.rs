@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use ferrosa_protocol::{clientbound::{game::{GameState, ItemKind, ItemTail, MenuType, ServerGamePacket, decode::SlotChange}, initial_sync::InitialSync}, codec::{Reader, WireRead}};
 
-use crate::{game::netgame::{ADMIN_NAME, EVENTS, HUMANS, INVENTORY_SLOTS, ITEMS, LINKS, MAX_ITEM_CHILDREN, MEMO_LINE, MEMO_SIZE, NetGame, PLAYERS, SCREEN_COLUMNS, SCREEN_LINES, STALE, TIMEOUT, TRAFFIC, VEHICLES, VOICE_FRAMES, VOICE_RECEIVED, entities::Item, sync::ServerSync}, net::ClientSocket};
+use crate::{game::netgame::{ADMIN_NAME, EVENTS, GAP, HUMANS, INVENTORY_SLOTS, ITEMS, LINKS, MAX_ITEM_CHILDREN, MEMO_LINE, MEMO_SIZE, NetGame, PLAYERS, SCREEN_COLUMNS, SCREEN_LINES, STALE, TIMEOUT, TRAFFIC, VEHICLES, VOICE_FRAMES, VOICE_RECEIVED, entities::Item, sync::ServerSync}, net::ClientSocket};
 
 impl NetGame {
     pub fn receive(&mut self, socket: &mut ClientSocket, now: u32) -> bool {
@@ -40,8 +40,14 @@ impl NetGame {
                 let accept =
                     |r: u32, t: u32| r == round && !(tick > t as i32 && tick - t as i32 <= STALE);
 
-                if let Ok(Some(p)) = ServerGamePacket::read(&mut r, &mut self.decoder, accept) {
-                    self.apply(p, now);
+                match ServerGamePacket::read(&mut r, &mut self.decoder, accept) {
+                    Ok(Some(p)) => {
+                        self.note_gap(now);
+                        self.dropped = 0;
+                        self.apply(p, now);
+                    }
+                    Ok(None) => self.note_drop("it is behind us or from another round"),
+                    Err(e) => self.note_drop(&format!("it would not decode: {e:?}")),
                 }
             }
             Ok(9) => {
@@ -53,6 +59,24 @@ impl NetGame {
             }
             _ => {}
         }
+    }
+
+    fn note_drop(&mut self, why: &str) {
+        self.dropped += 1;
+
+        if self.dropped.is_power_of_two() {
+            warn!("dropped {} game packets in a row, the last because {why}", self.dropped);
+        }
+    }
+
+    fn note_gap(&mut self, now: u32) {
+        let since = now.wrapping_sub(self.last_applied);
+
+        if self.last_applied > 0 && since > GAP {
+            warn!("{since}ms without a game packet we could use, {} of them dropped", self.dropped);
+        }
+
+        self.last_applied = now;
     }
 
     fn apply(&mut self, p: ServerGamePacket, now: u32) {
@@ -194,7 +218,7 @@ impl NetGame {
             let shown = (item.current_line, item.top_line, item.cursor);
 
             if let Some(hd) = &object.header {
-                item.kind = Some(object.item_type);
+                item.kind = object.item_type;
                 item.parent_item = hd.parent_item;
                 item.parent_human = hd.parent_human;
                 item.parent_slot = hd.parent_slot as u32;

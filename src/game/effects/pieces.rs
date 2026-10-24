@@ -24,6 +24,7 @@ pub(super) enum PieceKind {
 #[derive(Component)]
 pub(super) struct Piece {
     kind: PieceKind,
+    life: i32,
     pos: Vec3,
     vel: Vec3,
     axes: [Vec3; 3],
@@ -66,7 +67,7 @@ pub(super) fn spawn_piece(
 
     particles.pieces += 1;
     commands.spawn((
-        Piece { kind, pos, vel, axes, spin, was: (pos, axes) },
+        Piece { kind, life: 3600, pos, vel, axes, spin, was: (pos, axes) },
         Mesh3d(mesh),
         MeshMaterial3d(material),
         piece_transform(pos, &axes),
@@ -75,7 +76,13 @@ pub(super) fn spawn_piece(
     ));
 }
 
-pub(super) fn simulate_pieces(mut net: ResMut<NetGame>, level: Option<Res<Level>>, mut pieces: Query<&mut Piece>) {
+pub(super) fn simulate_pieces(
+    mut commands: Commands,
+    mut net: ResMut<NetGame>,
+    level: Option<Res<Level>>,
+    mut particles: ResMut<Particles>,
+    mut pieces: Query<(Entity, &mut Piece)>,
+) {
     if matches!(net.game_state, GameState::Restarting | GameState::Paused) {
         return;
     }
@@ -83,9 +90,17 @@ pub(super) fn simulate_pieces(mut net: ResMut<NetGame>, level: Option<Res<Level>
     let Some(level) = level else { return };
     let map = &level.map;
 
-    for mut piece in &mut pieces {
+    for (entity, mut piece) in &mut pieces {
         let piece = &mut *piece;
         piece.was = (piece.pos, piece.axes);
+        piece.life -= 1;
+
+        if piece.life <= 0 {
+            particles.pieces = particles.pieces.saturating_sub(1);
+            commands.entity(entity).despawn();
+
+            continue;
+        }
 
         if piece.vel == Vec3::ZERO && piece.spin == Vec3::ZERO {
             continue;
