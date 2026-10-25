@@ -54,7 +54,7 @@ fn flash_size(life: i32) -> Vec3 {
 }
 
 fn flash_glow(life: i32) -> f32 {
-    life as f32 / 4.0 * 400_000.0
+    life as f32 / 4.0 * 600_000.0
 }
 
 fn octahedron() -> Mesh {

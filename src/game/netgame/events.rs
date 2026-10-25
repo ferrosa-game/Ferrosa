@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use ferrosa_protocol::clientbound::game::{ItemKind, events::{ServerEvent, Event, chat::ChatType}};
+use ferrosa_protocol::clientbound::game::{ItemKind, VehicleKind, events::{ServerEvent, Event, chat::ChatType}};
 
 use crate::game::netgame::{CHAT_LENGTH, CellChange, CHAT_LINES, ChatLine, FRESH, ITEMS, LONG_CHAT, NetEvent, NetGame, PLAYERS, PROTECTOR, RESULT, ROLE, SHORT_CHAT, TARGET, entities::Track};
 
@@ -20,7 +20,9 @@ impl NetGame {
             ServerEvent::BulletHit(e) => NetEvent::BulletHit { hit: e.hit_type, pos: e.pos, normal: e.normal },
             ServerEvent::BulletHole(e) => NetEvent::BulletHole { pos: e.pos, vel: e.vel, cell: IVec3::new(e.block_x, e.block_y, e.block_z), face: e.face },
             ServerEvent::Explosion(e) => NetEvent::Explosion { pos: e.pos },
-            ServerEvent::UpdateVehicle(e) if e.kind == 0 => NetEvent::WindowBroke { vehicle: e.vehicle_id, window: e.part, pos: e.pos, vel: e.velocity },
+            ServerEvent::UpdateVehicle(e) if e.kind == 0 && self.vehicles.get(e.vehicle_id as usize).is_some_and(|v| v.kind != VehicleKind::Train) => {
+                NetEvent::WindowBroke { vehicle: e.vehicle_id, window: e.part, pos: e.pos, vel: e.velocity }
+            }
             ServerEvent::Sound(e) => NetEvent::Sound { sound: e.sound_type, pos: e.pos, volume: e.volume, pitch: e.pitch },
             ServerEvent::PhoneSound(e) => {
                 let item = self.items.get(e.item_id as usize).filter(|i| i.active)?;
