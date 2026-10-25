@@ -167,7 +167,7 @@ fn dial_tone(key: usize) -> Vec<f32> {
 
     (0..length)
         .map(|i: i32| {
-            let fade = 0.9f64.powi(i.saturating_sub(length - 32));
+            let fade = 0.9f64.powi((i - (length - 32)).max(0));
             let t = i as f64;
             (((step(high) * t).sin() + (step(low) * t).sin()) * fade * 0.25) as f32
         })

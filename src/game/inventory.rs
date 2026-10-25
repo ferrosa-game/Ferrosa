@@ -70,6 +70,12 @@ struct Cell(usize, usize);
 struct CellNote(usize, usize);
 
 #[derive(Component)]
+struct AmmoBar(usize, usize);
+
+#[derive(Component)]
+struct GunClip(usize, usize);
+
+#[derive(Component)]
 struct Flying;
 
 pub struct InventoryPlugin;
@@ -107,6 +113,13 @@ fn entry(code: i32) -> (Option<ItemKind>, i32) {
     (ItemKind::try_from((code & 0xff) as u8).ok(), code >> 8)
 }
 
+fn clip_of(types: &ItemTypes, kind: Option<ItemKind>) -> Option<ItemKind> {
+    let gun = kind? as usize;
+    let mag = types.0.iter().position(|t| t.magazine_ammo > 0 && t.can_mount_to.get(gun).is_some_and(|&m| m != 0))?;
+
+    ItemKind::try_from(u8::try_from(mag).ok()?).ok()
+}
+
 fn item_name(types: &ItemTypes, kind: Option<ItemKind>) -> Option<String> {
     let name = &types.0.get(kind? as usize)?.name;
 
@@ -141,7 +154,15 @@ fn spawn_inventory(mut commands: Commands, fonts: Res<GameFonts>) {
             commands.spawn((rect(align::BOTTOM_CENTRE, cell, BOX), UiTransform::default(), ImageNode::default(), Cell(slot, row), Visibility::Hidden, Pickable::IGNORE, ChildOf(screen)));
 
             if slot < 2 {
-                let (node, shift) = anchored(align::BOTTOM, cell);
+                let bar = rect(align::BOTTOM, cell + Vec2::new(1.0 - BOX.x * 0.5, -1.0), Vec2::new(0.0, 2.0));
+
+                commands.spawn((bar, AmmoBar(slot, row), BackgroundColor(Color::NONE), Visibility::Hidden, Pickable::IGNORE, ChildOf(screen)));
+
+                let clip = rect(align::BOTTOM, cell + Vec2::new(BOX.x * 0.5 - 49.0, -1.0), Vec2::new(48.0, 12.0));
+
+                commands.spawn((clip, GunClip(slot, row), ImageNode::default(), Visibility::Hidden, Pickable::IGNORE, ChildOf(screen)));
+
+                let (node, shift) = anchored(align::BOTTOM, cell + Vec2::new(8.0, -4.0));
 
                 commands.spawn((node, shift, CellNote(slot, row), text("", &fonts.osd_white, 8.0, Color::WHITE), ChildOf(screen)));
             }
@@ -158,9 +179,11 @@ fn show_inventory(
     icons: Res<ItemIcons>,
     mut parts: ParamSet<(
         Query<(&Cell, &mut ImageNode, &mut UiTransform, &mut Visibility)>,
-        Query<(&CellNote, &mut Node, &mut Text, &mut Visibility)>,
+        Query<(&CellNote, &mut Text, &mut Visibility)>,
         Query<(&SlotLabel, &mut Text, &mut TextColor, &mut Visibility)>,
         Query<(&SlotFrame, &mut BorderColor)>,
+        Query<(&AmmoBar, &mut Node, &mut BackgroundColor, &mut Visibility)>,
+        Query<(&GunClip, &mut ImageNode, &mut Visibility)>,
     )>,
 ) {
     let Some((p, h, _)) = own(&net) else { return };
@@ -211,25 +234,14 @@ fn show_inventory(
         }
     }
 
-    for (&CellNote(slot, row), mut node, mut t, mut v) in &mut parts.p1() {
-        let note = p.display_inventory[slot].get(row).map(|&c| entry(c)).and_then(|(kind, count)| {
-            let rounds = kind.and_then(|k| types.0.get(k as usize)).is_some_and(|t| t.magazine_ammo > 0);
+    for (&CellNote(slot, row), mut t, mut v) in &mut parts.p1() {
+        let rounds = p.display_inventory[slot].get(row).map(|&c| entry(c)).and_then(|(kind, count)| {
+            let mag = kind.and_then(|k| types.0.get(k as usize)).is_some_and(|t| t.magazine_ammo > 0);
 
-            if rounds {
-                Some((count.to_string(), 8.0))
-            } else if count > 0 && kind != Some(ItemKind::BriefcaseOpen) {
-                Some((if count == 1 { "+magazine" } else { "+empty magazine" }.to_string(), 0.0))
-            } else {
-                None
-            }
+            mag.then(|| count.to_string())
         });
-        let left = px(cell_at(slot, row).x + note.as_ref().map_or(0.0, |&(_, shift)| shift));
 
-        if node.left != left {
-            node.left = left;
-        }
-
-        set_text(&mut t, &mut v, note.map(|(note, _)| note));
+        set_text(&mut t, &mut v, rounds);
     }
 
     for (&SlotLabel(slot), mut t, mut colour, mut v) in &mut parts.p2() {
@@ -252,6 +264,53 @@ fn show_inventory(
 
         if edge.top != faded {
             *edge = BorderColor::all(faded);
+        }
+    }
+
+    for (&AmmoBar(slot, row), mut node, mut fill, mut v) in &mut parts.p4() {
+        let loaded = p.display_inventory[slot].get(row).map(|&c| entry(c)).and_then(|(kind, count)| {
+            let cap = kind.and_then(|k| types.0.get(k as usize)).map_or(0, |t| t.magazine_ammo);
+
+            (cap > 0).then(|| count.clamp(0, cap) as f32 / cap as f32)
+        });
+
+        shown(&mut v, loaded.is_some());
+
+        let Some(t) = loaded else { continue };
+        let width = px((BOX.x - 2.0) * t);
+        let colour = hud::colour([(2.0 - 2.0 * t).min(1.0), (2.0 * t).min(1.0), 0.0, 0.875]);
+
+        if node.width != width {
+            node.width = width;
+        }
+
+        if fill.0 != colour {
+            fill.0 = colour;
+        }
+    }
+
+    for (&GunClip(slot, row), mut image, mut v) in &mut parts.p5() {
+        let clip = p.display_inventory[slot].get(row).map(|&c| entry(c)).and_then(|(kind, count)| {
+            let gun = kind.and_then(|k| types.0.get(k as usize)).is_some_and(|t| t.is_gun);
+
+            if !gun || count == 0 {
+                return None;
+            }
+
+            Some((icons.of(Some(clip_of(&types, kind)?)), count == 1))
+        });
+
+        shown(&mut v, clip.is_some());
+
+        let Some((icon, full)) = clip else { continue };
+        let tint = if full { Color::WHITE } else { Color::srgb(1.0, 0.25, 0.25) };
+
+        if image.image != icon {
+            image.image = icon;
+        }
+
+        if image.color != tint {
+            image.color = tint;
         }
     }
 }
