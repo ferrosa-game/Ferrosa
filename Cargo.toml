@@ -7,7 +7,7 @@ edition = "2024"
 bevy = { version = "0.20", features = ["statically-linked-dxc"] }
 winit = "0.30.13"
 ab_glyph = "0.2.32"
-bevy_enhanced_input = "0.27"
+bevy_enhanced_input = "=0.27.0"
 steamworks = { version = "0.13.1", features = ["raw-bindings"] }
 rand = "0.10"
 cpal = "0.18.2"
@@ -32,3 +32,8 @@ opt-level = 1
 
 [profile.dev.package."*"]
 opt-level = 3
+
+[patch."https://github.com/ferrosa-game/Dedicated-Server.git"]
+ferrosa-protocol = { path = "../new_server/crates/ferrosa-protocol" }
+ferrosa-map = { path = "../new_server/crates/ferrosa-map" }
+ferrosa-world = { path = "../new_server/crates/ferrosa-world" }

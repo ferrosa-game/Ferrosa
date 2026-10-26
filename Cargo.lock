@@ -2917,7 +2917,6 @@ dependencies = [
 [[package]]
 name = "ferrosa-map"
 version = "0.2.1"
-source = "git+https://github.com/ferrosa-game/Dedicated-Server.git?branch=main#c576cc522471e5612ca93254946ae0459b0b6579"
 dependencies = [
  "binrw",
  "glam",
@@ -2930,7 +2929,6 @@ dependencies = [
 [[package]]
 name = "ferrosa-physics"
 version = "0.2.1"
-source = "git+https://github.com/ferrosa-game/Dedicated-Server.git?branch=main#c576cc522471e5612ca93254946ae0459b0b6579"
 dependencies = [
  "glam",
  "rayon",
@@ -2939,7 +2937,6 @@ dependencies = [
 [[package]]
 name = "ferrosa-protocol"
 version = "0.2.1"
-source = "git+https://github.com/ferrosa-game/Dedicated-Server.git?branch=main#c576cc522471e5612ca93254946ae0459b0b6579"
 dependencies = [
  "bitflags 2.13.2",
  "glam",
@@ -2950,7 +2947,6 @@ dependencies = [
 [[package]]
 name = "ferrosa-world"
 version = "0.2.1"
-source = "git+https://github.com/ferrosa-game/Dedicated-Server.git?branch=main#c576cc522471e5612ca93254946ae0459b0b6579"
 dependencies = [
  "ferrosa-map",
  "ferrosa-physics",
