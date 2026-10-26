@@ -32,8 +32,3 @@ opt-level = 1
 
 [profile.dev.package."*"]
 opt-level = 3
-
-[patch."https://github.com/ferrosa-game/Dedicated-Server.git"]
-ferrosa-protocol = { path = "../new_server/crates/ferrosa-protocol" }
-ferrosa-map = { path = "../new_server/crates/ferrosa-map" }
-ferrosa-world = { path = "../new_server/crates/ferrosa-world" }
